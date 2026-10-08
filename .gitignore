@@ -1,0 +1,15 @@
+.build/
+**/bin/
+**/obj/
+artifacts/
+.vs/
+*.user
+*.db
+*.db-shm
+*.db-wal
+TestResults/
+.env
+.env.*
+*.pfx
+*.p12
+*.key

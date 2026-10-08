@@ -1,0 +1,42 @@
+<Window x:Class="DailyRecord.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="E²-Day" Width="1360" Height="940" MinWidth="1000" MinHeight="650" Style="{StaticResource {x:Type Window}}"
+        WindowStartupLocation="CenterScreen">
+  <Grid Background="{StaticResource PageBrush}">
+    <Grid.ColumnDefinitions><ColumnDefinition Width="204" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+    <Border Background="{StaticResource SidebarBrush}" BorderBrush="{StaticResource SidebarLineBrush}" BorderThickness="0,0,1,0">
+      <Grid Margin="20,30,20,20">
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+        <StackPanel>
+          <Image Source="/Assets/e2-day-logo.png" Width="56" Height="56" HorizontalAlignment="Left" Margin="0,0,0,12"
+                 RenderOptions.BitmapScalingMode="HighQuality" ToolTip="E²-Day · 探索每一天" />
+          <TextBlock Text="E²-Day" FontSize="25" FontWeight="SemiBold" Margin="4,0,0,4" />
+          <TextBlock Text="Explore Everyday Day" Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="4,0,0,6" />
+          <TextBlock Text="探索每一天" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="4,0,0,26" />
+          <StackPanel x:Name="NavigationPanel" />
+        </StackPanel>
+        <StackPanel Grid.Row="2" Margin="4,0">
+          <TextBlock x:Name="SidebarDate" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,0,0,8" />
+          <TextBlock Text="●  个人本地记录" Foreground="{StaticResource AccentBrush}" FontSize="11" />
+          <TextBlock x:Name="SaveStatusText" FontSize="10" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0" TextWrapping="Wrap" />
+        </StackPanel>
+      </Grid>
+    </Border>
+    <Grid Grid.Column="1" Margin="32,26,28,18">
+      <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+      <Grid Margin="0,0,0,20">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+        <StackPanel>
+          <TextBlock x:Name="PageEyebrow" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,5" />
+          <TextBlock x:Name="PageTitle" FontSize="30" FontWeight="SemiBold" />
+          <TextBlock x:Name="PageSubtitle" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,8,0,0" TextWrapping="Wrap" />
+        </StackPanel>
+        <StackPanel x:Name="HeaderActions" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0" />
+      </Grid>
+      <ScrollViewer x:Name="PageScroller" Grid.Row="1"><StackPanel x:Name="PageBody" /></ScrollViewer>
+      <ScrollViewer x:Name="CalendarScroller" Grid.Row="1" Visibility="Hidden"><Border x:Name="CalendarHost" /></ScrollViewer>
+      <ScrollViewer x:Name="MonthScroller" Grid.Row="1" Visibility="Hidden"><Border x:Name="MonthHost" /></ScrollViewer>
+    </Grid>
+  </Grid>
+</Window>
