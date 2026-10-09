@@ -170,7 +170,7 @@ try {
             }
         }
         if ($release.draft) {
-            $release = Invoke-GitHubApi -Method PATCH -Path "/repos/$repoPath/releases/$($release.id)" -Body @{ name = $releaseTitle; body = $releaseBody }
+            $release = Invoke-GitHubApi -Method PATCH -Path "/repos/$repoPath/releases/$($release.id)" -Body @{ tag_name = $versionTag; target_commitish = $commitSha; name = $releaseTitle; body = $releaseBody }
         }
         foreach ($assetName in $assetNames) {
             $assetFile = Get-Item -LiteralPath (Join-Path $releaseDirectory $assetName)
@@ -207,7 +207,8 @@ try {
             }
             Write-Output "附件已验证：$assetName"
         }
-        $release = Invoke-GitHubApi -Method PATCH -Path "/repos/$repoPath/releases/$($release.id)" -Body @{ draft = $false; prerelease = $false; make_latest = 'true' }
+        $release = Invoke-GitHubApi -Method PATCH -Path "/repos/$repoPath/releases/$($release.id)" -Body @{ tag_name = $versionTag; target_commitish = $commitSha; draft = $false; prerelease = $false; make_latest = 'true' }
+        if ($release.tag_name -ne $versionTag -or $release.draft) { throw '发布页版本标签或公开状态与目标不一致。' }
         Write-Output "发布成功：$($release.html_url)"
     }
     $repository = Invoke-GitHubApi -Path "/repos/$repoPath"
