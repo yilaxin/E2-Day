@@ -59,6 +59,7 @@ public partial class MainWindow
         var title = Ui.Text((record.IsImportant ? "★ " : "") + record.Title, 13, bold: record.IsImportant); title.Margin = new Thickness(0, 9, 0, 5);
         var panel = Ui.Stack(heading, title, Ui.Text($"当时原定日期：{record.ScheduledDate:yyyy-MM-dd}", 10, Ui.Muted));
         if (record.Notes.Length > 0) { var note = Ui.Text(record.Notes, 11, Ui.Muted); note.Margin = new Thickness(0, 6, 0, 0); panel.Children.Add(note); }
+        if (record.ImageIds.Count > 0) panel.Children.Add(NoteImages.Gallery(_service.GetNoteImages(record.ImageIds), this));
         return Ui.Card(panel, new Thickness(16));
     }
 
@@ -122,7 +123,7 @@ public partial class MainWindow
     {
         var dialog = new SaveFileDialog { Title = "导出 E²-Day 备份", Filter = "E²-Day 备份 (*.json)|*.json", FileName = $"E²-Day备份-{_service.Today:yyyy-MM-dd}.json" };
         if (dialog.ShowDialog(this) != true) return;
-        try { SqliteStore.WriteBackup(dialog.FileName, _service.State); MessageBox.Show(this, "备份已导出。", "导出完成"); }
+        try { _service.ExportBackup(dialog.FileName); MessageBox.Show(this, "备份已导出。", "导出完成"); }
         catch (Exception ex) { MessageBox.Show(this, ex.Message, "导出失败"); }
     }
     private void ImportBackup()

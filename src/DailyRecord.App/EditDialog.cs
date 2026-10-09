@@ -14,27 +14,31 @@ internal sealed class EditDialog : Window
     private readonly ComboBox _scope;
     private readonly CheckBox _importantTask;
     private readonly TextBlock _hint;
+    private readonly NoteImageEditor _images;
     private readonly bool _isEvent;
     private readonly bool _isRecurring;
     public string ItemTitle => _title.Text.Trim();
     public string Notes => _notes.Text.Trim();
+    public IReadOnlyList<NoteImage> Images => _images.Images;
+    internal NoteImageEditor ImageEditor => _images;
     public DateOnly Date => DateOnly.FromDateTime(_date.SelectedDate!.Value);
     public EventImportance Importance => (EventImportance)_importance.SelectedIndex;
     public RepeatRule Repeat => (RepeatRule)_repeat.SelectedIndex;
     public EditScope Scope => _scope.SelectedIndex == 1 ? EditScope.ThisAndFuture : EditScope.ThisOccurrence;
     public bool ImportantTask => _importantTask.IsChecked == true;
 
-    public EditDialog(Window owner, DateOnly date, bool isEvent, TaskItem? task = null, EventDefinition? ev = null)
+    public EditDialog(Window owner, DateOnly date, bool isEvent, TaskItem? task = null, EventDefinition? ev = null, IEnumerable<NoteImage>? images = null)
     {
         if (owner.IsLoaded) Owner = owner;
         Style = (Style)Application.Current.FindResource(typeof(Window));
         Title = task is null ? isEvent ? "安排一件事" : "添加任务" : isEvent ? "编辑日历事件" : "编辑任务";
-        Width = 510; SizeToContent = SizeToContent.Height; MaxHeight = 870; ResizeMode = ResizeMode.NoResize;
+        Width = 560; SizeToContent = SizeToContent.Height; MaxHeight = Math.Min(900, SystemParameters.WorkArea.Height - 50); ResizeMode = ResizeMode.NoResize;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         _isEvent = isEvent;
         _isRecurring = ev is { Repeat: not RepeatRule.None };
         _title = new TextBox { Text = task?.Title ?? "", MaxLength = 500 };
         _notes = new TextBox { Text = task?.Notes ?? "", AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Height = 82, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        _images = new NoteImageEditor(images);
         _date = new DatePicker { SelectedDate = date.ToDateTime(TimeOnly.MinValue), DisplayDateStart = new DateTime(1901, 1, 1), DisplayDateEnd = new DateTime(2100, 12, 31) };
         _importance = new ComboBox { ItemsSource = new[] { "普通 · 当天提醒", "重要 · 提前提醒", "非常重要 · 提前提醒" }, SelectedIndex = (int)(task?.EventImportance ?? EventImportance.Normal) };
         _repeat = new ComboBox { ItemsSource = Enum.GetValues<RepeatRule>().Select(Ui.Repeat).ToList(), SelectedIndex = (int)(ev?.Repeat ?? RepeatRule.None) };
@@ -55,7 +59,7 @@ internal sealed class EditDialog : Window
             }
             form.Children.Add(Ui.Label("重复规则")); form.Children.Add(_repeat); form.Children.Add(_hint);
         }
-        form.Children.Add(Ui.Label("备注（可选）")); form.Children.Add(_notes);
+        form.Children.Add(Ui.Label("备注 · 文字与图片（可选）")); form.Children.Add(_notes); form.Children.Add(_images);
         if (!isEvent || task is not null)
         {
             _importantTask.Margin = new Thickness(0, 18, 0, 0);
@@ -89,6 +93,7 @@ internal sealed class EditDialog : Window
     }
     private void Accept()
     {
+        if (!_images.PendingImport.IsCompleted) { MessageBox.Show(this, "图片还在处理中，请稍等。", "正在添加图片"); return; }
         if (string.IsNullOrWhiteSpace(ItemTitle)) { MessageBox.Show(this, "请填写标题。", "还差一个标题"); _title.Focus(); return; }
         if (_date.SelectedDate is null) { MessageBox.Show(this, "请选择有效日期。", "检查日期"); return; }
         DialogResult = true;

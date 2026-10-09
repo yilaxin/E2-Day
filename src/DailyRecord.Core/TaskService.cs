@@ -19,18 +19,18 @@ public sealed class TaskService
         Save();
     }
 
-    public void Save()
+    public void Save(IEnumerable<NoteImage>? images = null)
     {
         // Also invalidate readers if validation fails and State is reloaded.
         Revision++;
-        try { _store.Save(State); }
+        try { _store.Save(State, images); }
         catch { State = _store.Load(); throw; }
         try
         {
             _store.DailyBackup(State, Today);
             SaveStatus = $"已保存 · {_clock.Now:HH:mm}";
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
         { SaveStatus = "记录已保存，自动备份失败，请检查存储空间或权限"; }
         Changed?.Invoke();
     }
@@ -57,6 +57,7 @@ public sealed class TaskService
         {
             EventId = ev.Id, OccurrenceDate = occurrence, ScheduledDate = occurrence,
             OriginalScheduledDate = occurrence, Title = ev.Title, Notes = ev.Notes,
+            ImageIds = [.. ev.ImageIds],
             EventImportance = ev.Importance, CreatedAt = _clock.Now
         };
         State.Tasks.Add(task);
@@ -64,26 +65,28 @@ public sealed class TaskService
         return task;
     }
 
-    public TaskItem AddTask(string title, string notes, DateOnly date, bool important = false)
+    public TaskItem AddTask(string title, string notes, DateOnly date, bool important = false, IReadOnlyList<NoteImage>? images = null)
     {
         ValidateTitle(title);
+        var ids = PrepareImages(images);
         var task = new TaskItem
         {
             Title = title.Trim(), Notes = notes.Trim(), ScheduledDate = date,
-            OriginalScheduledDate = date, IsImportant = important, CreatedAt = _clock.Now
+            OriginalScheduledDate = date, IsImportant = important, CreatedAt = _clock.Now, ImageIds = ids
         };
         State.Tasks.Add(task);
-        Save();
+        Save(images);
         return task;
     }
 
-    public EventDefinition AddEvent(string title, string notes, DateOnly date, EventImportance importance, RepeatRule repeat)
+    public EventDefinition AddEvent(string title, string notes, DateOnly date, EventImportance importance, RepeatRule repeat, IReadOnlyList<NoteImage>? images = null)
     {
         var ev = CreateDefinition(title, notes, date, importance, repeat);
+        ev.ImageIds = PrepareImages(images);
         State.Events.Add(ev);
         EnsureUpcoming();
         EnsureOccurrence(ev, ev.StartDate);
-        Save();
+        Save(images);
         return ev;
     }
 
@@ -163,27 +166,31 @@ public sealed class TaskService
         Save();
     }
 
-    public void EditTask(TaskItem task, string title, string notes, DateOnly date, bool important)
+    public void EditTask(TaskItem task, string title, string notes, DateOnly date, bool important, IReadOnlyList<NoteImage>? images = null)
     {
         ValidateTitle(title);
+        var ids = images is null ? task.ImageIds : PrepareImages(images);
         task.Title = title.Trim();
         task.Notes = notes.Trim();
+        task.ImageIds = [.. ids];
         task.ScheduledDate = date;
         task.IsImportant = important;
         task.HasOverride = task.IsEvent;
-        Save();
+        Save(images);
     }
 
     public void EditEvent(TaskItem selected, string title, string notes, DateOnly date,
-        EventImportance importance, RepeatRule repeat, EditScope scope)
+        EventImportance importance, RepeatRule repeat, EditScope scope, IReadOnlyList<NoteImage>? images = null)
     {
         var old = State.Events.Single(e => e.Id == selected.EventId);
         var replacement = CreateDefinition(title, notes, date, importance,
             old.Repeat != RepeatRule.None && scope == EditScope.ThisOccurrence ? RepeatRule.None : repeat);
+        replacement.ImageIds = images is null ? [.. selected.ImageIds] : PrepareImages(images);
         if (old.Repeat == RepeatRule.None)
         {
             old.Title = replacement.Title;
             old.Notes = replacement.Notes;
+            old.ImageIds = [.. replacement.ImageIds];
             old.StartDate = replacement.StartDate;
             old.Importance = replacement.Importance;
             old.Repeat = replacement.Repeat;
@@ -214,8 +221,13 @@ public sealed class TaskService
             selected.HasOverride = false;
             ApplyDefinition(selected, replacement, replacement.StartDate);
         }
+        if (selected.State != TaskState.Open && images is not null)
+        {
+            // The task's current notes can change; activity snapshots keep the original images.
+            selected.Notes = notes.Trim(); selected.ImageIds = [.. replacement.ImageIds];
+        }
         EnsureUpcoming();
-        Save();
+        Save(images);
     }
 
     private static void ApplyDefinition(TaskItem task, EventDefinition ev, DateOnly date)
@@ -223,6 +235,7 @@ public sealed class TaskService
         if (task.State != TaskState.Open) return;
         task.Title = ev.Title;
         task.Notes = ev.Notes;
+        task.ImageIds = [.. ev.ImageIds];
         task.ScheduledDate = date;
         task.EventImportance = ev.Importance;
     }
@@ -346,10 +359,10 @@ public sealed class TaskService
 
     public void RestoreBackup(string path)
     {
-        var restored = SqliteStore.ReadBackup(path);
+        var restored = SqliteStore.ReadBackupData(path);
         _store.BeforeRestoreBackup(State);
-        _store.Save(restored);
-        State = restored;
+        _store.Save(restored.State, restored.Images);
+        State = restored.State;
         EnsureUpcoming();
         Save();
     }
@@ -357,8 +370,17 @@ public sealed class TaskService
     private ActivityRecord Snapshot(TaskItem task, ActivityKind kind) => new()
     {
         TaskId = task.Id, Kind = kind, Day = Today, At = _clock.Now,
-        Title = task.Title, Notes = task.Notes, ScheduledDate = task.ScheduledDate, IsImportant = task.IsImportant
+        Title = task.Title, Notes = task.Notes, ImageIds = [.. task.ImageIds], ScheduledDate = task.ScheduledDate, IsImportant = task.IsImportant
     };
+    public IReadOnlyList<NoteImage> GetNoteImages(IEnumerable<string> ids) => _store.GetNoteImages(ids);
+    public void ExportBackup(string path) => _store.ExportBackup(path, State);
+
+    private static List<string> PrepareImages(IReadOnlyList<NoteImage>? images)
+    {
+        var list = images ?? [];
+        foreach (var image in list) image.Validate();
+        var ids = list.Select(i => i.Id).ToList(); NoteImage.ValidateIds(ids); return ids;
+    }
     private static void ValidateTitle(string title)
     {
         if (string.IsNullOrWhiteSpace(title)) throw new ArgumentException("请填写标题。");

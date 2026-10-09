@@ -62,6 +62,7 @@ internal static class SmokeTest
         VerifyCalendarCache(window, service, clock, outputDirectory);
         VerifyMonthView(window, service, outputDirectory);
         await VerifyTaskShare(window, service, holidays, clock, outputDirectory);
+        await VerifyNoteImages(window, service, holidays, outputDirectory);
 
         foreach (var page in Enum.GetValues<PageKind>())
         {
@@ -70,14 +71,84 @@ internal static class SmokeTest
         }
         var editor = new EditDialog(window, service.Today, true);
         var editorRoot = (FrameworkElement)editor.Content;
-        Render(editorRoot, 510, 720, Path.Combine(outputDirectory, "event-editor.png"));
+        Render(editorRoot, 560, 850, Path.Combine(outputDirectory, "event-editor.png"));
         File.WriteAllText(Path.Combine(outputDirectory, "result.txt"),
-            "PASS: WPF root layout; 4 page renders; event editor render; mark/unmark important; complete/undo; viewed/undo; persisted state; calendar control reuse, task changes, completion, rescheduling, cancellation, backup restore, day rollover and leap-year switching; month zoom, task previews, completion fading, overflow, month/year navigation and return to overview; task share image, empty/long lists, filtering, native bitmap + PNG data, copy button and clipboard contention retries.\nScreenshots use explicit preview data in an isolated data directory. Clipboard tests use a recording backend and leave the system clipboard untouched.\nRuntime: " + System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory());
+            "PASS: WPF root layout; 4 page renders; event editor render; mark/unmark important; complete/undo; viewed/undo; persisted state; calendar control reuse, task changes, completion, rescheduling, cancellation, backup restore, day rollover and leap-year switching; month zoom, task previews, completion fading, overflow, month/year navigation and return to overview; task share image, empty/long lists, filtering, native bitmap + PNG data, copy button and clipboard contention retries; note image upload callback, PNG/JPEG import, orientation, scaling, thumbnails, preview, draft isolation, removal, invalid files, size/count limits and history images.\nScreenshots use explicit preview data in an isolated data directory. Clipboard tests use a recording backend and leave the system clipboard untouched. Image picker tests inject file paths and do not open the system dialog.\nRuntime: " + System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory());
+    }
+
+    private static async Task VerifyNoteImages(MainWindow window, TaskService service, HolidayService holidays, string outputDirectory)
+    {
+        void Check(bool valid, string message) { if (!valid) throw new InvalidOperationException(message); }
+        Button EditorButton(DependencyObject editor, string tag) => Descendants(editor).OfType<Button>().Single(b => Equals(b.Tag, tag));
+        var baseline = Path.Combine(outputDirectory, "note-images-baseline.json"); service.ExportBackup(baseline);
+        var sourcePath = Path.Combine(outputDirectory, "备注上传示例.png");
+        var invalidPath = Path.Combine(outputDirectory, "invalid-image.txt");
+        var largePath = Path.Combine(outputDirectory, "oversized-image.png");
+        var jpegPath = Path.Combine(outputDirectory, "orientation.jpg");
+        var previewAction = NoteImages.OpenPreview;
+        try
+        {
+            var reference = Ui.Card(Ui.Stack(Ui.Text("项目参考笔记", 30, Ui.Accent, true),
+                Ui.Text("示例图片 · 任务备注", 15, Ui.Muted), Ui.Text("\n1. 需求整理\n\n2. 界面验证\n\n3. 发布检查", 21)), new Thickness(32));
+            reference.Margin = new Thickness(16); Render(reference, 680, 370, sourcePath);
+            var task = service.AddTask("将参考截图附在任务备注里", "文字和图片可以一起记录。", service.Today, true);
+            var editor = new EditDialog(window, service.Today, false, task);
+            var beforeDraft = StateJson.Serialize(service.State);
+            editor.ImageEditor.SelectFiles = () => [sourcePath];
+            EditorButton(editor, "upload-note-images").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            await editor.ImageEditor.PendingImport;
+            Check(editor.Images.Count == 1, "上传按钮未添加图片。");
+            Check(StateJson.Serialize(service.State) == beforeDraft, "编辑草稿改动了保存的数据。");
+            var image = editor.Images.Single();
+            Check(NoteImages.Decode(image).IsFrozen, "图片未完成加载并释放文件。");
+            await editor.ImageEditor.AddFilesAsync([sourcePath]); Check(editor.Images.Count == 1, "重复上传了同一图片。");
+            Render((FrameworkElement)editor.Content, 560, 800, Path.Combine(outputDirectory, "note-image-editor.png"));
+            File.WriteAllText(invalidPath, "这不是一张图片"); await editor.ImageEditor.AddFilesAsync([invalidPath]);
+            Check(editor.Images.Count == 1, "损坏图片改变了草稿。");
+            using (var oversized = File.Create(largePath)) oversized.SetLength(20_000_001);
+            await editor.ImageEditor.AddFilesAsync([largePath]); Check(editor.Images.Count == 1, "超大文件改变了草稿。");
+            await editor.ImageEditor.AddFilesAsync(Enumerable.Repeat(sourcePath, 9).ToArray()); Check(editor.Images.Count == 1, "过多文件改变了草稿。");
+            service.EditTask(task, task.Title, task.Notes, task.ScheduledDate, task.IsImportant, editor.Images);
+            File.Delete(sourcePath);
+            Check(service.GetNoteImages(task.ImageIds).Single().Data.SequenceEqual(image.Data), "删除原文件后备注图片丢失。");
+            window.Navigate(PageKind.Today); Prepare(window);
+            var previewed = false; NoteImages.OpenPreview = (_, selected) => previewed = selected.Id == image.Id;
+            Click(window, "note-image:" + image.Id); Check(previewed, "缩略图没有打开对应的图片。");
+            Render((FrameworkElement)window.Content, 1400, 940, Path.Combine(outputDirectory, "note-image-task.png"));
+            var preview = NoteImages.CreatePreview(window, image);
+            Render((FrameworkElement)preview.Content, 904, 660, Path.Combine(outputDirectory, "note-image-preview.png"));
+            Check(Descendants(preview).OfType<Image>().Single().Source.Width > 0, "放大窗口未显示图片。"); preview.Close();
+            EditorButton(editor, "remove-note-image:" + image.Id).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(editor.Images.Count == 0 && task.ImageIds.Count == 1, "移除草稿图片立即修改了任务。");
+            service.ToggleCompleted(task); service.EditTask(task, task.Title, "已更新备注", task.ScheduledDate, true, editor.Images);
+            window.Navigate(PageKind.History); Prepare(window);
+            Check(Descendants(window).OfType<Button>().Any(b => Equals(b.Tag, "note-image:" + image.Id)), "历史快照丢失图片。");
+            Check(!Descendants(TaskShareImage.Build(service, holidays)).OfType<Button>().Any(b => Equals(b.Tag, "note-image:" + image.Id)), "备注图片意外进入分享清单。");
+            editor.ImageEditor.ReadClipboardImage = () => NoteImages.Decode(image);
+            EditorButton(editor, "paste-note-image").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(editor.Images.Count == 1 && task.ImageIds.Count == 0, "粘贴图片未添加到独立草稿。");
+            editor.Close();
+
+            var pixels = new byte[4096 * 64 * 4];
+            for (var i = 3; i < pixels.Length; i += 4) pixels[i] = 255;
+            var wide = BitmapSource.Create(4096, 64, 96, 96, PixelFormats.Bgra32, null, pixels, 4096 * 4);
+            var scaled = NoteImages.Decode(NoteImages.Normalize(wide, "大图.png")); Check(scaled.PixelWidth == 2048, "大图未缩小。");
+            var metadata = new BitmapMetadata("jpg"); metadata.SetQuery("/app1/ifd/{ushort=274}", (ushort)6);
+            var encoder = new JpegBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(wide, null, metadata, null));
+            using (var file = File.Create(jpegPath)) encoder.Save(file);
+            var rotated = NoteImages.Decode(NoteImages.ImportFile(jpegPath));
+            Check(rotated.PixelHeight == 2048 && rotated.PixelWidth < 64, "手机图片方向未修正。");
+        }
+        finally
+        {
+            NoteImages.OpenPreview = previewAction; service.RestoreBackup(baseline); window.Navigate(PageKind.Today);
+            foreach (var path in new[] { baseline, sourcePath, invalidPath, largePath, jpegPath }) if (File.Exists(path)) File.Delete(path);
+        }
     }
 
     private static async Task VerifyTaskShare(MainWindow window, TaskService service, HolidayService holidays, PreviewClock clock, string outputDirectory)
     {
-        var baseline = Path.Combine(outputDirectory, "share-baseline.json"); SqliteStore.WriteBackup(baseline, service.State);
+        var baseline = Path.Combine(outputDirectory, "share-baseline.json"); service.ExportBackup(baseline);
         void Check(bool valid, string message) { if (!valid) throw new InvalidOperationException(message); }
         var originalToday = clock.Today;
         var originalClipboard = window.ImageClipboard;
@@ -152,7 +223,7 @@ internal static class SmokeTest
 
     private static void VerifyMonthView(MainWindow window, TaskService service, string outputDirectory)
     {
-        var baseline = Path.Combine(outputDirectory, "month-baseline.json"); SqliteStore.WriteBackup(baseline, service.State);
+        var baseline = Path.Combine(outputDirectory, "month-baseline.json"); service.ExportBackup(baseline);
         void Check(bool valid, string message) { if (!valid) throw new InvalidOperationException(message); }
         Button Day(DateOnly day) => FindButton(window, "month-date:" + day.ToString("yyyy-MM-dd"));
         try
@@ -198,7 +269,7 @@ internal static class SmokeTest
     private static void VerifyCalendarCache(MainWindow window, TaskService service, PreviewClock clock, string outputDirectory)
     {
         var baseline = Path.Combine(outputDirectory, "calendar-cache-baseline.json");
-        SqliteStore.WriteBackup(baseline, service.State);
+        service.ExportBackup(baseline);
         var originalToday = clock.Today;
         var date = new DateOnly(2026, 3, 19);
         var updateMeasurements = new List<string>();

@@ -18,12 +18,12 @@ Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese
 
 ## 下载与开始使用
 
-当前版本：**1.0.4**。程序采用免安装、自包含的文件夹发布方式，下载包内已包含所需的 .NET 运行依赖。
+当前版本：**1.0.5**。程序采用免安装、自包含的文件夹发布方式，下载包内已包含所需的 .NET 运行依赖。
 
 | 你的电脑 | 下载文件 |
 | --- | --- |
-| Intel / AMD 处理器的 64 位 Windows 电脑 | [E2-Day-v1.0.4-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/v1.0.4/E2-Day-v1.0.4-win-x64.zip) |
-| Snapdragon 等 ARM 处理器的 Windows ARM64 电脑 | [E2-Day-v1.0.4-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/v1.0.4/E2-Day-v1.0.4-win-arm64.zip) |
+| Intel / AMD 处理器的 64 位 Windows 电脑 | [E2-Day-v1.0.5-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/v1.0.5/E2-Day-v1.0.5-win-x64.zip) |
+| Snapdragon 等 ARM 处理器的 Windows ARM64 电脑 | [E2-Day-v1.0.5-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/v1.0.5/E2-Day-v1.0.5-win-arm64.zip) |
 
 1. 在 Windows“设置 → 系统 → 关于 → 系统类型”中确认电脑架构，选择对应下载包。
 2. **完整解压**到一个固定文件夹，保留程序旁边的 DLL、图标和 `Data` 文件夹。
@@ -37,6 +37,7 @@ Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese
 | 功能 | 你可以做什么 |
 | --- | --- |
 | 今日清单 | 快速添加任务，标记重要，完成或撤销，编辑、改期、取消和恢复 |
+| 备注图片 | 在任务或事件备注中上传多图、粘贴截图，点击缩略图放大，图片随历史与备份保存 |
 | 逾期延续 | 未完成任务继续留在待办里，显示原定日期和逾期天数 |
 | 提前提醒 | 日历事件按三档提前进入清单，默认提前 0 / 3 / 7 天 |
 | 全年与月度日历 | 一眼看完整年，点击月份放大，按日期查看任务、农历、节日和调休 |
@@ -49,6 +50,18 @@ Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese
 ## 1. 今日清单：记录、执行和回看
 
 在输入框填写标题，按 Enter 或点击“添加”，即可创建今天的任务。右上角“添加任务”可填写标题、备注、日期和重要标记。
+
+**1.0.5 新增备注图片**：编辑任务或事件时，在文字备注下面点击“上传图片”选择多张图片，或点击“粘贴图片”添加剪贴板中的截图。点击“保存”后生效，取消编辑不会改变原备注。
+
+每则备注最多 **8 张**，单张原图不超过 **20 MB**，支持 PNG、JPG、BMP、GIF 和 TIFF；GIF/TIFF 使用第一帧。大图自动缩小到最长边 2048 像素并保存为 PNG。任务卡片、日期详情和历史记录显示缩略图，点击可放大，通过滑块缩放或“适应窗口”查看。
+
+![备注图片编辑](docs/images/note-image-editor.png)
+
+图片保存在本机数据库，移动或删除原始文件后仍可查看。当前备注与历史快照独立保存：完成、查看或取消时记录当时的图片，之后修改或移除当前备注的图片不会覆盖已经保存的历史图片。重复事件按“仅这一次”或“这一次及以后”的编辑范围继承图片。
+
+![任务卡片中的备注图片](docs/images/note-image-task.png)
+
+![备注图片缩放查看](docs/images/note-image-preview.png)
 
 - **重要任务**：点击 `☆` 切换为 `★`，使用金色标签和边框突出显示，并优先排序。重启或恢复备份后仍保留。任务星标只改变显示与排序，不改变事件的提前提醒天数。
 - **完成与撤销**：点击“完成”进入淡化、划线的已完成区域，同时记录实际完成日期；点“撤销”恢复未完成状态。
@@ -100,6 +113,7 @@ Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese
 - 在“偏好设置”或历史页点击“导出备份”，导出 JSON 文件。
 - “从备份恢复”先验证结构和 SHA-256 完整性校验，再提示恢复会替换当前记录；恢复前另存一份当前记录的备份。
 - 数据与备份保存在本地，**没有云同步，也没有加密存储**。更换电脑时请自行转移导出的备份。
+- 备注图片随自动备份、手动导出和恢复前备份一起保存，可在另一电脑独立恢复。1.0.5 兼容读取旧版无图备份；新格式备份需要 **1.0.5 或更新版本** 读取。新版本保存后的数据库格式也已升级，更新前请保留旧版导出备份，避免直接使用旧程序打开升级后的数据。
 - 更新前关闭程序，再完整解压新的程序包。它继续读取原有本地数据目录；更新前建议导出一份备份。
 
 ## 6. 今日任务复制为图片

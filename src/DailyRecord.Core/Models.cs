@@ -26,6 +26,7 @@ public sealed class EventDefinition
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Title { get; set; } = "";
     public string Notes { get; set; } = "";
+    public List<string> ImageIds { get; set; } = [];
     public DateOnly StartDate { get; set; }
     public DateOnly? EndDate { get; set; }
     public EventImportance Importance { get; set; }
@@ -43,6 +44,7 @@ public sealed class TaskItem
     public DateOnly OriginalScheduledDate { get; set; }
     public string Title { get; set; } = "";
     public string Notes { get; set; } = "";
+    public List<string> ImageIds { get; set; } = [];
     public EventImportance EventImportance { get; set; }
     public bool IsImportant { get; set; }
     public bool HasOverride { get; set; }
@@ -62,6 +64,7 @@ public sealed class ActivityRecord
     public DateTimeOffset At { get; set; }
     public string Title { get; set; } = "";
     public string Notes { get; set; } = "";
+    public List<string> ImageIds { get; set; } = [];
     public DateOnly ScheduledDate { get; set; }
     public bool IsImportant { get; set; }
     public bool Reverted { get; set; }
@@ -99,7 +102,7 @@ public sealed class NewsCache
 
 public sealed class AppState
 {
-    public int SchemaVersion { get; set; } = 1;
+    public int SchemaVersion { get; set; } = 2;
     public List<EventDefinition> Events { get; set; } = [];
     public List<TaskItem> Tasks { get; set; } = [];
     public List<ActivityRecord> Activities { get; set; } = [];
@@ -121,11 +124,12 @@ public static class StateJson
         var state = JsonSerializer.Deserialize<AppState>(json, Options)
             ?? throw new InvalidDataException("文件没有有效的数据。");
         Validate(state);
+        state.SchemaVersion = 2;
         return state;
     }
     public static void Validate(AppState state)
     {
-        if (state.SchemaVersion != 1) throw new InvalidDataException("此数据版本不受支持。");
+        if (state.SchemaVersion is not (1 or 2)) throw new InvalidDataException("此数据版本不受支持。");
         if (state.Events is null || state.Tasks is null || state.Activities is null ||
             state.Settings is null || state.News is null || state.News.Articles is null)
             throw new InvalidDataException("数据缺少必要字段。");
@@ -141,6 +145,7 @@ public static class StateJson
         var tasks = state.Tasks.Select(t => t.Id).ToHashSet();
         foreach (var task in state.Tasks)
         {
+            NoteImage.ValidateIds(task.ImageIds);
             if (string.IsNullOrWhiteSpace(task.Id) || string.IsNullOrWhiteSpace(task.Title) || task.Notes is null ||
                 !ValidDate(task.ScheduledDate) || !ValidDate(task.OriginalScheduledDate) ||
                 task.OccurrenceDate is { } occurrence && !ValidDate(occurrence) ||
@@ -152,6 +157,7 @@ public static class StateJson
         }
         foreach (var ev in state.Events)
         {
+            NoteImage.ValidateIds(ev.ImageIds);
             if (string.IsNullOrWhiteSpace(ev.Id) || string.IsNullOrWhiteSpace(ev.Title) || ev.Notes is null || !ValidDate(ev.StartDate) ||
                 !Enum.IsDefined(ev.Repeat) || !Enum.IsDefined(ev.Importance) ||
                 ev.Repeat == RepeatRule.LunarYearly && (LunarDates.FromSolar(ev.StartDate) is null || ev.LunarMonth is < 1 or > 12 || ev.LunarDay is < 1 or > 30))
@@ -162,6 +168,7 @@ public static class StateJson
         if (state.Activities.Any(a => !tasks.Contains(a.TaskId) || !Enum.IsDefined(a.Kind) ||
             string.IsNullOrWhiteSpace(a.Title) || a.Notes is null || !ValidDate(a.Day) || !ValidDate(a.ScheduledDate)))
             throw new InvalidDataException("历史记录缺少对应任务。");
+        foreach (var activity in state.Activities) NoteImage.ValidateIds(activity.ImageIds);
         if (state.News.Articles.Any(a => string.IsNullOrWhiteSpace(a.Title) || a.Summary is null ||
             a.Url is null || a.Source is null || a.Language is null))
             throw new InvalidDataException("资讯缓存数据无效。");

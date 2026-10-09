@@ -333,6 +333,116 @@ Test("重复ID验证失败不改变SQLite已保存记录", () =>
     Equal(1, f.Service.State.Tasks.Count, "内存未回到已保存状态");
 });
 
+Test("备注图片随任务持久化，原始文件删除不影响重启读取", () =>
+{
+    var directory = Path.Combine(runRoot, "image-restart"); var clock = new FakeClock(new(2026, 10, 9));
+    var original = Path.Combine(directory, "original.png"); Directory.CreateDirectory(directory);
+    File.WriteAllBytes(original, Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aN1kAAAAASUVORK5CYII="));
+    var image = NoteImage.Create("示例.png", File.ReadAllBytes(original)); string id;
+    using (var store = new SqliteStore(directory))
+    {
+        var service = new TaskService(store, clock);
+        var task = service.AddTask("带图任务", "文字备注", clock.Today, images: [image]); id = task.Id;
+        service.EditTask(task, task.Title, "修改文字", clock.Today, false);
+        Equal(image.Id, task.ImageIds.Single(), "只改文字应保留图片");
+        Check(!StateJson.Serialize(service.State).Contains(Convert.ToBase64String(image.Data)), "任务状态不应重复存储图片字节");
+    }
+    File.Delete(original);
+    using var reopened = new SqliteStore(directory); var loaded = new TaskService(reopened, clock);
+    Equal("修改文字", loaded.State.Tasks.Single(t => t.Id == id).Notes, "重启丢失文字");
+    Check(loaded.GetNoteImages(loaded.State.Tasks.Single().ImageIds).Single().Data.SequenceEqual(image.Data), "原图删除后图片丢失");
+});
+Test("备注图片移除、取消和完成快照相互独立", () =>
+{
+    using var f = NewFixture(); var image = NoteImage.Create("记录.png", Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aN1kAAAAASUVORK5CYII="));
+    var task = f.Service.AddTask("记录", "原始备注", f.Clock.Today, images: [image]); f.Service.ToggleCompleted(task);
+    f.Service.EditTask(task, "记录", "新的备注", f.Clock.Today, false, []);
+    Equal(0, task.ImageIds.Count, "移除未生效");
+    Equal(image.Id, f.Service.State.Activities.Single().ImageIds.Single(), "修改覆盖了完成快照");
+    Check(f.Service.GetNoteImages(f.Service.State.Activities.Single().ImageIds).Single().Data.SequenceEqual(image.Data), "历史图片被删除");
+    f.Service.ToggleCompleted(task); f.Service.EditTask(task, task.Title, task.Notes, f.Clock.Today, false, [image]);
+    f.Service.CancelTask(task); f.Service.RestoreTask(task);
+    Equal(image.Id, task.ImageIds.Single(), "取消/恢复丢失图片");
+    var disposable = f.Service.AddTask("只用一次的图片", "", f.Clock.Today, images: [image]);
+    f.Service.EditTask(disposable, disposable.Title, "", f.Clock.Today, false, []);
+    Equal(image.Id, f.Service.State.Activities.First().ImageIds.Single(), "移除另一个任务影响历史图片");
+});
+Test("重复事件图片遵循仅本次和本次及以后范围", () =>
+{
+    using var f = NewFixture();
+    var bytes = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aN1kAAAAASUVORK5CYII=");
+    var first = NoteImage.Create("原图.png", bytes);
+    var secondBytes = bytes.Concat(new byte[] { 0 }).ToArray(); var second = NoteImage.Create("新图.png", secondBytes);
+    var ev = f.Service.AddEvent("每周安排", "", f.Clock.Today, EventImportance.Normal, RepeatRule.Weekly, [first]);
+    var task = f.Service.State.Tasks.Single();
+    f.Service.EditEvent(task, "本次备注", "", f.Clock.Today, EventImportance.Normal, RepeatRule.Weekly, EditScope.ThisOccurrence, [second]);
+    Equal(second.Id, task.ImageIds.Single(), "本次未使用新图片");
+    var next = f.Service.EnsureOccurrence(ev, f.Clock.Today.AddDays(7)); Equal(first.Id, next.ImageIds.Single(), "仅本次影响了下次");
+    f.Service.EditEvent(next, "以后的备注", "", next.ScheduledDate, EventImportance.Normal, RepeatRule.Weekly, EditScope.ThisAndFuture, [second]);
+    var replacement = f.Service.State.Events.Single(e => e.Id == next.EventId);
+    var future = f.Service.EnsureOccurrence(replacement, next.ScheduledDate.AddDays(7)); Equal(second.Id, future.ImageIds.Single(), "未来实例没有继承图片");
+    f.Service.ToggleCompleted(future);
+    f.Service.EditEvent(future, "新标题", "完成后的备注", future.ScheduledDate, EventImportance.Normal, RepeatRule.Weekly, EditScope.ThisOccurrence, []);
+    Equal(0, future.ImageIds.Count, "已完成任务不能修改备注图片");
+    Equal("以后的备注", future.Title, "修改图片改变已完成标题");
+    Equal(second.Id, f.Service.State.Activities.Last(a => a.Kind == ActivityKind.Completed).ImageIds.Single(), "已完成图片快照丢失");
+});
+Test("图片备份可在另一数据库独立恢复，并保留恢复前图片", () =>
+{
+    using var source = NewFixture(); using var target = NewFixture();
+    var image = NoteImage.Create("参考.png", Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aN1kAAAAASUVORK5CYII="));
+    var task = source.Service.AddTask("附图", "文字", source.Clock.Today, images: [image]); source.Service.ToggleCompleted(task);
+    var path = Path.Combine(source.Store.DataDirectory, "with-images.json"); source.Service.ExportBackup(path);
+    Equal(1, SqliteStore.ReadBackupData(path).Images.Count, "共享引用重复导出图片");
+    target.Service.AddTask("当前图片", "", target.Clock.Today, images: [image]); target.Service.RestoreBackup(path);
+    Check(target.Service.GetNoteImages(target.Service.State.Tasks.Single().ImageIds).Single().Data.SequenceEqual(image.Data), "异地恢复丢失图片");
+    var before = Directory.GetFiles(target.Store.BackupDirectory, "恢复前-*.json").Single();
+    Equal(image.Id, SqliteStore.ReadBackupData(before).Images.Single().Id, "恢复前备份丢失图片");
+    var automatic = Path.Combine(target.Store.BackupDirectory, $"{target.Clock.Today:yyyy-MM-dd}.json");
+    Equal(image.Id, SqliteStore.ReadBackupData(automatic).Images.Single().Id, "自动备份漏图片");
+});
+Test("旧版无图备份和数据库兼容迁移", () =>
+{
+    using var f = NewFixture(); f.Service.AddTask("旧任务", "旧备注", f.Clock.Today);
+    var legacy = System.Text.Json.Nodes.JsonNode.Parse(StateJson.Serialize(f.Service.State))!; legacy["SchemaVersion"] = 1;
+    foreach (var item in legacy["Tasks"]!.AsArray()) item!.AsObject().Remove("ImageIds");
+    var payload = legacy.ToJsonString();
+    var envelope = new BackupEnvelope { Payload = payload, Sha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(payload))) };
+    var path = Path.Combine(f.Store.DataDirectory, "legacy.json"); File.WriteAllText(path, JsonSerializer.Serialize(envelope, StateJson.Options));
+    f.Service.RestoreBackup(path); Equal(2, f.Service.State.SchemaVersion, "旧备份未升级"); Equal(0, f.Service.State.Tasks.Single().ImageIds.Count, "旧任务图片应为空");
+    var legacyState = StateJson.Deserialize(payload); legacyState.SchemaVersion = 1; f.Store.Save(legacyState);
+    Equal(2, f.Store.Load().SchemaVersion, "旧数据库无法读取"); Equal("旧备注", f.Store.Load().Tasks.Single().Notes, "迁移丢失文字");
+});
+Test("图片缺失和数据损坏拒绝恢复，现有记录及图片不变", () =>
+{
+    using var f = NewFixture(); var image = NoteImage.Create("图片.png", Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aN1kAAAAASUVORK5CYII="));
+    f.Service.AddTask("保留记录", "", f.Clock.Today, images: [image]);
+    var path = Path.Combine(f.Store.DataDirectory, "broken-image.json");
+    var envelope = JsonSerializer.Deserialize<BackupEnvelope>(SqliteStore.ExportText(f.Service.State, [image]), StateJson.Options)!;
+    envelope.Images.Clear();
+    envelope.Sha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(envelope.Payload + "\n" + JsonSerializer.Serialize(envelope.Images, StateJson.Options))));
+    File.WriteAllText(path, JsonSerializer.Serialize(envelope, StateJson.Options));
+    try { f.Service.RestoreBackup(path); throw new Exception("缺图片备份未拒绝"); } catch (InvalidDataException) { }
+    Equal("保留记录", f.Store.Load().Tasks.Single().Title, "失败恢复覆盖记录"); Check(f.Service.GetNoteImages([image.Id]).Single().Data.SequenceEqual(image.Data), "失败恢复破坏图片");
+    envelope = JsonSerializer.Deserialize<BackupEnvelope>(SqliteStore.ExportText(f.Service.State, [image]), StateJson.Options)!;
+    envelope.Images[0].Data[8] ^= 1;
+    File.WriteAllText(path, JsonSerializer.Serialize(envelope, StateJson.Options));
+    try { f.Service.RestoreBackup(path); throw new Exception("图片篡改未拒绝"); } catch (InvalidDataException) { }
+    Equal(1, f.Store.Load().Tasks.Count, "图片校验失败破坏记录");
+});
+Test("无效图片引用保存回滚、数量限制及不再使用图片清理", () =>
+{
+    using var f = NewFixture(); var image = NoteImage.Create("图片.png", Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aN1kAAAAASUVORK5CYII="));
+    var task = f.Service.AddTask("任务", "", f.Clock.Today, images: [image]);
+    task.ImageIds = [new string('A', 64)];
+    try { f.Service.Save(); throw new Exception("缺图片引用未拒绝"); } catch (InvalidDataException) { }
+    Equal(image.Id, f.Service.State.Tasks.Single().ImageIds.Single(), "失败保存未回滚图片关联");
+    try { f.Service.AddTask("无效", "", f.Clock.Today, images: Enumerable.Repeat(image, 9).ToList()); throw new Exception("数量限制未生效"); } catch (InvalidDataException) { }
+    Equal(1, f.Service.State.Tasks.Count, "无效添加留下任务");
+    task = f.Service.State.Tasks.Single(); f.Service.EditTask(task, task.Title, "", f.Clock.Today, false, []);
+    try { f.Service.GetNoteImages([image.Id]); throw new Exception("无引用图片未清理"); } catch (InvalidDataException) { }
+});
+
 if (args.Contains("--network"))
 {
     try

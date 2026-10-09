@@ -13,3 +13,4 @@ TestResults/
 *.pfx
 *.p12
 *.key
+/AGENTS.md

@@ -249,6 +249,7 @@ public partial class MainWindow : Window
         left.Children.Add(badges);
         if (!string.IsNullOrWhiteSpace(task.Notes))
         { var note = Ui.Text(task.Notes, 11, Ui.Muted); note.MaxHeight = 44; note.TextTrimming = TextTrimming.CharacterEllipsis; note.Margin = new Thickness(0, 6, 0, 0); left.Children.Add(note); }
+        if (task.ImageIds.Count > 0) left.Children.Add(NoteImages.Gallery(_service.GetNoteImages(task.ImageIds), this));
         content.Children.Add(left);
         var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Top };
         var star = Ui.Button(task.IsImportant ? "★" : "☆", () => Run(() => _service.ToggleImportant(task), refresh), quiet: true);
@@ -292,26 +293,26 @@ public partial class MainWindow : Window
     private void OpenTaskEditor(DateOnly date, Action? refresh = null)
     {
         var dialog = new EditDialog(this, date, false);
-        if (dialog.ShowDialog() == true) Run(() => _service.AddTask(dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.ImportantTask), refresh);
+        if (dialog.ShowDialog() == true) Run(() => _service.AddTask(dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.ImportantTask, dialog.Images), refresh);
     }
     private void OpenEventEditor(DateOnly date, Action? refresh = null)
     {
         var dialog = new EditDialog(this, date, true);
-        if (dialog.ShowDialog() == true) Run(() => _service.AddEvent(dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.Importance, dialog.Repeat), refresh);
+        if (dialog.ShowDialog() == true) Run(() => _service.AddEvent(dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.Importance, dialog.Repeat, dialog.Images), refresh);
     }
     private void EditExisting(TaskItem task, Action? refresh = null)
     {
         var ev = task.IsEvent ? _service.State.Events.FirstOrDefault(e => e.Id == task.EventId) : null;
-        var dialog = new EditDialog(this, task.ScheduledDate, task.IsEvent, task, ev);
+        var dialog = new EditDialog(this, task.ScheduledDate, task.IsEvent, task, ev, _service.GetNoteImages(task.ImageIds));
         if (dialog.ShowDialog() != true) return;
         Run(() =>
         {
             if (task.IsEvent)
             {
-                _service.EditEvent(task, dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.Importance, dialog.Repeat, dialog.Scope);
+                _service.EditEvent(task, dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.Importance, dialog.Repeat, dialog.Scope, dialog.Images);
                 if (task.IsImportant != dialog.ImportantTask) _service.ToggleImportant(task);
             }
-            else _service.EditTask(task, dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.ImportantTask);
+            else _service.EditTask(task, dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.ImportantTask, dialog.Images);
         }, refresh);
     }
     private void CancelExisting(TaskItem task, Action? refresh = null)
