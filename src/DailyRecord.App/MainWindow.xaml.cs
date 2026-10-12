@@ -232,6 +232,7 @@ public partial class MainWindow : Window
 
     private Border TaskRow(TaskItem task, bool dim = false, Action? refresh = null)
     {
+        var longTerm = _service.IsLongTerm(task);
         var content = new Grid(); content.ColumnDefinitions.Add(new ColumnDefinition());
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var title = Ui.Text(task.Title, 13, bold: task.IsImportant);
@@ -239,11 +240,12 @@ public partial class MainWindow : Window
         var left = Ui.Stack(title); left.Margin = new Thickness(0, 0, 8, 0);
         var badges = new WrapPanel { Margin = new Thickness(0, 7, 0, 0) };
         if (task.IsImportant) badges.Children.Add(Ui.Badge("★ 重要任务", true));
-        if (task.IsEvent) badges.Children.Add(Ui.Badge(Ui.Importance(task.EventImportance), task.EventImportance != EventImportance.Normal));
+        if (longTerm) badges.Children.Add(Ui.Badge("长期任务"));
+        else if (task.IsEvent) badges.Children.Add(Ui.Badge(Ui.Importance(task.EventImportance), task.EventImportance != EventImportance.Normal));
         var dateLabel = task.ScheduledDate.ToString("M 月 d 日");
         if (task.State == TaskState.Completed) dateLabel += $" · {task.CompletedOn:M/d} 已完成";
         else if (task.State == TaskState.Cancelled) dateLabel += " · " + task.ArchiveReason;
-        else if (task.ScheduledDate < _service.Today) dateLabel += $" · 逾期 {_service.Today.DayNumber - task.ScheduledDate.DayNumber} 天";
+        else if (task.ScheduledDate < _service.Today) dateLabel += longTerm ? " · 当日未完成" : $" · 逾期 {_service.Today.DayNumber - task.ScheduledDate.DayNumber} 天";
         else if (task.ScheduledDate > _service.Today) dateLabel += $" · 还有 {task.ScheduledDate.DayNumber - _service.Today.DayNumber} 天";
         badges.Children.Add(Ui.Text(dateLabel, 10, task.ScheduledDate < _service.Today && task.State == TaskState.Open ? Ui.Amber : Ui.Muted));
         left.Children.Add(badges);
@@ -257,27 +259,37 @@ public partial class MainWindow : Window
         star.FontSize = 19; star.Padding = new Thickness(5, 4, 5, 4); star.ToolTip = task.IsImportant ? "取消重要标记" : "标记为重要任务";
         System.Windows.Automation.AutomationProperties.SetName(star, task.IsImportant ? "取消重要标记" : "标记为重要任务");
         actions.Children.Add(star);
-        if (task.State == TaskState.Open && task.IsEvent)
+        if (task.State == TaskState.Open && task.IsEvent && !longTerm)
         {
             var seen = Ui.Button(_service.IsViewed(task, _service.Today) ? "撤销查看" : "看过", () => Run(() => _service.ToggleViewed(task), refresh), quiet: true);
             seen.FontSize = 11; seen.Padding = new Thickness(5, 7, 5, 7); seen.Tag = "viewed:" + task.Id; actions.Children.Add(seen);
         }
         if (task.State != TaskState.Cancelled)
         {
-            var complete = Ui.Button(task.State == TaskState.Completed ? "撤销" : "完成", () => Run(() => _service.ToggleCompleted(task), refresh), quiet: task.State == TaskState.Completed);
+            var complete = Ui.Button(task.State == TaskState.Completed ? "撤销" : longTerm ? "今日完成" : "完成", () => Run(() => _service.ToggleCompleted(task), refresh), quiet: task.State == TaskState.Completed);
             complete.FontSize = 11; complete.Padding = new Thickness(9, 7, 9, 7); complete.Tag = "complete:" + task.Id;
             actions.Children.Add(complete);
         }
-        else actions.Children.Add(Ui.Button("恢复", () => Run(() => _service.RestoreTask(task), refresh)));
+        else actions.Children.Add(Ui.Button(longTerm ? "重新开始" : "恢复", () => Run(() =>
+        { if (longTerm) _service.ResumeLongTerm(task); else _service.RestoreTask(task); }, refresh)));
+        if (longTerm && _service.IsLongTermActive(task))
+        {
+            var end = Ui.Button("结束", () => Run(() => _service.EndLongTerm(task), refresh), quiet: true);
+            end.FontSize = 11; end.Foreground = Ui.Amber; end.Padding = new Thickness(5, 7, 5, 7);
+            end.ToolTip = "结束整个长期任务，从现在起停止每天出现"; end.Tag = "end-long-term:" + task.Id; actions.Children.Add(end);
+        }
         var more = Ui.Button("⋯", () => { }, quiet: true); more.FontSize = 18; more.Padding = new Thickness(4, 2, 4, 2); more.ToolTip = "编辑、改期或取消";
         var menu = new ContextMenu();
         if (task.State != TaskState.Cancelled)
         {
-            var edit = new MenuItem { Header = "编辑 / 改期" }; edit.Click += (_, _) => EditExisting(task, refresh); menu.Items.Add(edit);
-            if (task.State == TaskState.Open)
+            var edit = new MenuItem { Header = longTerm ? "编辑长期任务" : "编辑 / 改期" }; edit.Click += (_, _) => EditExisting(task, refresh); menu.Items.Add(edit);
+            if (task.State == TaskState.Open && !longTerm)
             { var cancel = new MenuItem { Header = "取消并归档" }; cancel.Click += (_, _) => CancelExisting(task, refresh); menu.Items.Add(cancel); }
         }
-        else { var restore = new MenuItem { Header = "恢复此任务" }; restore.Click += (_, _) => Run(() => _service.RestoreTask(task), refresh); menu.Items.Add(restore); }
+        else { var restore = new MenuItem { Header = longTerm ? "重新开始长期任务" : "恢复此任务" }; restore.Click += (_, _) => Run(() =>
+            { if (longTerm) _service.ResumeLongTerm(task); else _service.RestoreTask(task); }, refresh); menu.Items.Add(restore); }
+        if (longTerm && !_service.IsLongTermActive(task) && task.State != TaskState.Cancelled)
+        { var resume = new MenuItem { Header = "重新开始长期任务" }; resume.Click += (_, _) => Run(() => _service.ResumeLongTerm(task), refresh); menu.Items.Add(resume); }
         more.ContextMenu = menu; more.Click += (_, _) => { menu.PlacementTarget = more; menu.IsOpen = true; }; actions.Children.Add(more);
         Grid.SetColumn(actions, 1); content.Children.Add(actions);
         return new Border
@@ -293,7 +305,11 @@ public partial class MainWindow : Window
     private void OpenTaskEditor(DateOnly date, Action? refresh = null)
     {
         var dialog = new EditDialog(this, date, false);
-        if (dialog.ShowDialog() == true) Run(() => _service.AddTask(dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.ImportantTask, dialog.Images), refresh);
+        if (dialog.ShowDialog() == true) Run(() =>
+        {
+            if (dialog.LongTermTask) _service.AddLongTermTask(dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.ImportantTask, dialog.Images);
+            else _service.AddTask(dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.ImportantTask, dialog.Images);
+        }, refresh);
     }
     private void OpenEventEditor(DateOnly date, Action? refresh = null)
     {
@@ -303,15 +319,18 @@ public partial class MainWindow : Window
     private void EditExisting(TaskItem task, Action? refresh = null)
     {
         var ev = task.IsEvent ? _service.State.Events.FirstOrDefault(e => e.Id == task.EventId) : null;
-        var dialog = new EditDialog(this, task.ScheduledDate, task.IsEvent, task, ev, _service.GetNoteImages(task.ImageIds));
+        var longTerm = _service.IsLongTerm(task);
+        var dialog = new EditDialog(this, longTerm ? ev!.StartDate : task.ScheduledDate, task.IsEvent && !longTerm, task, ev, _service.GetNoteImages(task.ImageIds));
         if (dialog.ShowDialog() != true) return;
         Run(() =>
         {
-            if (task.IsEvent)
+            if (longTerm) _service.EditLongTerm(task, dialog.ItemTitle, dialog.Notes, dialog.ImportantTask, dialog.Images);
+            else if (task.IsEvent)
             {
                 _service.EditEvent(task, dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.Importance, dialog.Repeat, dialog.Scope, dialog.Images);
                 if (task.IsImportant != dialog.ImportantTask) _service.ToggleImportant(task);
             }
+            else if (dialog.LongTermTask) _service.ConvertToLongTerm(task, dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.ImportantTask, dialog.Images);
             else _service.EditTask(task, dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.ImportantTask, dialog.Images);
         }, refresh);
     }

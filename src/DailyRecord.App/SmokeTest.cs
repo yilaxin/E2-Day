@@ -9,7 +9,7 @@ using DailyRecord.Core;
 
 namespace DailyRecord.App;
 
-internal static class SmokeTest
+internal static partial class SmokeTest
 {
     public static async Task Run(MainWindow window, TaskService service, HolidayService holidays, PreviewClock clock, string outputDirectory)
     {
@@ -63,6 +63,7 @@ internal static class SmokeTest
         VerifyMonthView(window, service, outputDirectory);
         await VerifyTaskShare(window, service, holidays, clock, outputDirectory);
         await VerifyNoteImages(window, service, holidays, outputDirectory);
+        VerifyLongTermTasks(window, service, clock, outputDirectory);
 
         foreach (var page in Enum.GetValues<PageKind>())
         {

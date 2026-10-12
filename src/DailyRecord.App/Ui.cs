@@ -77,6 +77,7 @@ internal static class Ui
         DailyRecord.Core.RepeatRule.Monthly => "每月",
         DailyRecord.Core.RepeatRule.Yearly => "每年（公历）",
         DailyRecord.Core.RepeatRule.LunarYearly => "每年（农历）",
+        DailyRecord.Core.RepeatRule.Daily => "每天（长期任务）",
         _ => "不重复"
     };
 }

@@ -4,10 +4,10 @@ using System.Text.Json.Serialization;
 namespace DailyRecord.Core;
 
 public enum EventImportance { Normal, Important, VeryImportant }
-public enum RepeatRule { None, Weekly, Monthly, Yearly, LunarYearly }
+public enum RepeatRule { None, Weekly, Monthly, Yearly, LunarYearly, Daily }
 public enum TaskState { Open, Completed, Cancelled }
 public enum EditScope { ThisOccurrence, ThisAndFuture }
-public enum ActivityKind { Viewed, Completed, Cancelled }
+public enum ActivityKind { Viewed, Completed, Cancelled, Ended }
 
 public interface IClock
 {
@@ -28,6 +28,7 @@ public sealed class EventDefinition
     public string Notes { get; set; } = "";
     public List<string> ImageIds { get; set; } = [];
     public DateOnly StartDate { get; set; }
+    public bool IsImportant { get; set; }
     public DateOnly? EndDate { get; set; }
     public EventImportance Importance { get; set; }
     public RepeatRule Repeat { get; set; }

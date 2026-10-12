@@ -1,6 +1,6 @@
 namespace DailyRecord.Core;
 
-public sealed class TaskService
+public sealed partial class TaskService
 {
     private readonly SqliteStore _store;
     private readonly IClock _clock;
@@ -44,7 +44,8 @@ public sealed class TaskService
     private void EnsureUpcoming()
     {
         foreach (var ev in State.Events)
-            foreach (var day in Recurrence.Between(ev, ev.StartDate, Today.AddDays(State.Settings.LeadDays(ev.Importance))))
+            foreach (var day in Recurrence.Between(ev, ev.Repeat == RepeatRule.Daily ? Today : ev.StartDate,
+                         ev.Repeat == RepeatRule.Daily ? Today : Today.AddDays(State.Settings.LeadDays(ev.Importance))))
                 EnsureOccurrence(ev, day);
     }
 
@@ -57,7 +58,7 @@ public sealed class TaskService
         {
             EventId = ev.Id, OccurrenceDate = occurrence, ScheduledDate = occurrence,
             OriginalScheduledDate = occurrence, Title = ev.Title, Notes = ev.Notes,
-            ImageIds = [.. ev.ImageIds],
+            ImageIds = [.. ev.ImageIds], IsImportant = ev.IsImportant,
             EventImportance = ev.Importance, CreatedAt = _clock.Now
         };
         State.Tasks.Add(task);
@@ -106,6 +107,7 @@ public sealed class TaskService
     public void ToggleImportant(TaskItem task)
     {
         task.IsImportant = !task.IsImportant;
+        if (IsLongTerm(task) && task.ScheduledDate == Today) SetLongTermImportance(task);
         Save();
     }
 
@@ -186,6 +188,7 @@ public sealed class TaskService
         var replacement = CreateDefinition(title, notes, date, importance,
             old.Repeat != RepeatRule.None && scope == EditScope.ThisOccurrence ? RepeatRule.None : repeat);
         replacement.ImageIds = images is null ? [.. selected.ImageIds] : PrepareImages(images);
+        if (replacement.Repeat == RepeatRule.Daily) replacement.IsImportant = selected.IsImportant;
         if (old.Repeat == RepeatRule.None)
         {
             old.Title = replacement.Title;
@@ -194,6 +197,7 @@ public sealed class TaskService
             old.StartDate = replacement.StartDate;
             old.Importance = replacement.Importance;
             old.Repeat = replacement.Repeat;
+            old.IsImportant = replacement.IsImportant;
             old.LunarMonth = replacement.LunarMonth;
             old.LunarDay = replacement.LunarDay;
             old.EndDate = null;
@@ -254,11 +258,11 @@ public sealed class TaskService
         Save();
     }
 
-    public DateOnly ReminderStart(TaskItem task) => task.IsEvent
+    public DateOnly ReminderStart(TaskItem task) => task.IsEvent && !IsLongTerm(task)
         ? task.ScheduledDate.AddDays(-State.Settings.LeadDays(task.EventImportance)) : task.ScheduledDate;
 
     public IEnumerable<TaskItem> VisibleOpen(DateOnly day) => Sort(State.Tasks.Where(t =>
-        t.State == TaskState.Open && ReminderStart(t) <= day));
+        t.State == TaskState.Open && (IsLongTerm(t) ? t.ScheduledDate == day && IsLongTermActive(t, day) : ReminderStart(t) <= day)));
 
     public static IEnumerable<TaskItem> Sort(IEnumerable<TaskItem> tasks) => tasks
         .OrderByDescending(t => t.IsImportant).ThenByDescending(t => t.EventImportance)
@@ -313,7 +317,8 @@ public sealed class TaskService
                 if (ev.Repeat == RepeatRule.None ? existingEvents.Contains(ev.Id) : existingOccurrences.Contains((ev.Id, occurrence))) continue;
                 var day = Day(occurrence);
                 day.Count++; day.Titles.Add((ev.Title, ev.Importance));
-                day.Tasks.Add(new(ev.Title, false, TaskState.Open, true, ev.Importance));
+                day.Important |= ev.IsImportant;
+                day.Tasks.Add(new(ev.Title, ev.IsImportant, TaskState.Open, true, ev.Importance));
             }
         return days.ToDictionary(p => p.Key, p => new CalendarDaySummary(p.Value.Count, p.Value.RecordedCount,
             p.Value.Important, p.Value.Titles.OrderByDescending(t => t.Importance).Select(t => t.Title).ToArray())

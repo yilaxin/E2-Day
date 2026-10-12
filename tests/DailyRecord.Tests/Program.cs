@@ -443,6 +443,8 @@ Test("无效图片引用保存回滚、数量限制及不再使用图片清理",
     try { f.Service.GetNoteImages([image.Id]); throw new Exception("无引用图片未清理"); } catch (InvalidDataException) { }
 });
 
+LongTermTaskTests.Run(Test, Check, () => NewFixture());
+
 if (args.Contains("--network"))
 {
     try

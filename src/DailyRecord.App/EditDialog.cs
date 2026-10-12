@@ -13,6 +13,7 @@ internal sealed class EditDialog : Window
     private readonly ComboBox _repeat;
     private readonly ComboBox _scope;
     private readonly CheckBox _importantTask;
+    private readonly CheckBox _longTerm;
     private readonly TextBlock _hint;
     private readonly NoteImageEditor _images;
     private readonly bool _isEvent;
@@ -22,24 +23,29 @@ internal sealed class EditDialog : Window
     public IReadOnlyList<NoteImage> Images => _images.Images;
     internal NoteImageEditor ImageEditor => _images;
     public DateOnly Date => DateOnly.FromDateTime(_date.SelectedDate!.Value);
-    public EventImportance Importance => (EventImportance)_importance.SelectedIndex;
+    public EventImportance Importance => Repeat == RepeatRule.Daily ? EventImportance.Normal : (EventImportance)_importance.SelectedIndex;
     public RepeatRule Repeat => (RepeatRule)_repeat.SelectedIndex;
     public EditScope Scope => _scope.SelectedIndex == 1 ? EditScope.ThisAndFuture : EditScope.ThisOccurrence;
     public bool ImportantTask => _importantTask.IsChecked == true;
+    public bool LongTermTask => _longTerm.IsChecked == true;
 
     public EditDialog(Window owner, DateOnly date, bool isEvent, TaskItem? task = null, EventDefinition? ev = null, IEnumerable<NoteImage>? images = null)
     {
         if (owner.IsLoaded) Owner = owner;
         Style = (Style)Application.Current.FindResource(typeof(Window));
         Title = task is null ? isEvent ? "安排一件事" : "添加任务" : isEvent ? "编辑日历事件" : "编辑任务";
+        if (ev?.Repeat == RepeatRule.Daily) Title = "编辑长期任务";
         Width = 560; SizeToContent = SizeToContent.Height; MaxHeight = Math.Min(900, SystemParameters.WorkArea.Height - 50); ResizeMode = ResizeMode.NoResize;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         _isEvent = isEvent;
         _isRecurring = ev is { Repeat: not RepeatRule.None };
-        _title = new TextBox { Text = task?.Title ?? "", MaxLength = 500 };
+        _title = new TextBox { Text = task?.Title ?? "", MaxLength = 500, Tag = "task-title" };
         _notes = new TextBox { Text = task?.Notes ?? "", AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Height = 82, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         _images = new NoteImageEditor(images);
         _date = new DatePicker { SelectedDate = date.ToDateTime(TimeOnly.MinValue), DisplayDateStart = new DateTime(1901, 1, 1), DisplayDateEnd = new DateTime(2100, 12, 31) };
+        _date.IsEnabled = ev?.Repeat != RepeatRule.Daily;
+        _longTerm = new CheckBox { Content = "长期任务 · 每天出现，手动结束", IsChecked = ev?.Repeat == RepeatRule.Daily,
+            IsEnabled = ev?.Repeat != RepeatRule.Daily, Tag = "long-term-task" };
         _importance = new ComboBox { ItemsSource = new[] { "普通 · 当天提醒", "重要 · 提前提醒", "非常重要 · 提前提醒" }, SelectedIndex = (int)(task?.EventImportance ?? EventImportance.Normal) };
         _repeat = new ComboBox { ItemsSource = Enum.GetValues<RepeatRule>().Select(Ui.Repeat).ToList(), SelectedIndex = (int)(ev?.Repeat ?? RepeatRule.None) };
         _scope = new ComboBox { ItemsSource = new[] { "仅这一次", "这一次及以后" }, SelectedIndex = 0 };
@@ -48,7 +54,13 @@ internal sealed class EditDialog : Window
         _hint.Margin = new Thickness(0, 8, 0, 0);
 
         var form = Ui.Stack(Ui.Text(Title, 23, bold: true), Ui.Text("保存后会自动记录在本地。", 12, Ui.Muted),
-            Ui.Label("标题"), _title, Ui.Label("日期"), _date);
+            Ui.Label("标题"), _title, Ui.Label("日期 / 长期任务开始日期"), _date);
+        if (!isEvent)
+        {
+            _longTerm.Margin = new Thickness(0, 16, 0, 5); form.Children.Add(_longTerm);
+            form.Children.Add(Ui.Text(ev?.Repeat == RepeatRule.Daily ? "修改用于今天未完成及后续任务，历史记录保留。结束请使用任务上的‘结束’按钮。" :
+                "当天完成只记录今天，第二天继续出现，直到手动结束。", 11, Ui.Muted));
+        }
         if (isEvent)
         {
             form.Children.Add(Ui.Label("事件重要程度 · 决定提前提醒天数"));
@@ -78,6 +90,7 @@ internal sealed class EditDialog : Window
 
     private void UpdateHint()
     {
+        _importance.IsEnabled = Repeat != RepeatRule.Daily;
         _repeat.IsEnabled = !_isRecurring || Scope == EditScope.ThisAndFuture;
         if (_isRecurring && Scope == EditScope.ThisOccurrence)
         { _hint.Text = "只修改这一次的安排，其余重复日期保持原规则。"; return; }
@@ -89,7 +102,8 @@ internal sealed class EditDialog : Window
                 $"按农历 {lunar.Month} 月 {lunar.Day} 日逐年重复，不额外生成闰月。" +
                 (lunar.IsLeapMonth ? $" 首次日期按普通月份调整为 {LunarDates.NormalizeRegularMonth(day):yyyy-MM-dd}。" : "");
         }
-        else _hint.Text = Repeat == RepeatRule.Monthly ? "遇到不存在的日期，使用当月最后一天，后续仍按原始日期重复。" : "每次分别记录完成状态。";
+        else _hint.Text = Repeat == RepeatRule.Daily ? "每天出现在清单中，不提前提醒。今日完成后明天继续，使用‘结束’停止。" :
+            Repeat == RepeatRule.Monthly ? "遇到不存在的日期，使用当月最后一天，后续仍按原始日期重复。" : "每次分别记录完成状态。";
     }
     private void Accept()
     {

@@ -18,12 +18,12 @@ Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese
 
 ## 下载与开始使用
 
-当前版本：**1.0.5**。程序采用免安装、自包含的文件夹发布方式，下载包内已包含所需的 .NET 运行依赖。
+当前版本：**1.0.6**。程序采用免安装、自包含的文件夹发布方式，下载包内已包含所需的 .NET 运行依赖。
 
 | 你的电脑 | 下载文件 |
 | --- | --- |
-| Intel / AMD 处理器的 64 位 Windows 电脑 | [E2-Day-v1.0.5-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/v1.0.5/E2-Day-v1.0.5-win-x64.zip) |
-| Snapdragon 等 ARM 处理器的 Windows ARM64 电脑 | [E2-Day-v1.0.5-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/v1.0.5/E2-Day-v1.0.5-win-arm64.zip) |
+| Intel / AMD 处理器的 64 位 Windows 电脑 | [E2-Day-v1.0.6-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/v1.0.6/E2-Day-v1.0.6-win-x64.zip) |
+| Snapdragon 等 ARM 处理器的 Windows ARM64 电脑 | [E2-Day-v1.0.6-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/v1.0.6/E2-Day-v1.0.6-win-arm64.zip) |
 
 1. 在 Windows“设置 → 系统 → 关于 → 系统类型”中确认电脑架构，选择对应下载包。
 2. **完整解压**到一个固定文件夹，保留程序旁边的 DLL、图标和 `Data` 文件夹。
@@ -68,6 +68,18 @@ Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese
 - **逾期延续**：未完成的事情第二天继续显示，原定日期不变。例如 10 月 5 日的任务在 10 月 7 日仍未完成，会显示逾期 2 天。
 - **编辑、改期、取消**：点击任务右侧 `⋯` 操作。取消保留记录，在历史页勾选“含已取消”后可以找到并恢复。
 - **看过提醒**：日历事件关联的任务有“看过”按钮，点击后移入“今日已查看”，第二天重新提醒。看过不等于完成，不计入完成数量。
+
+## 长期任务：每天继续，手动结束
+
+在“添加任务”中勾选“长期任务 · 每天出现，手动结束”，选择开始日期后保存。现有普通任务也可在编辑窗口转换为长期任务。
+
+点击“今日完成”只完成当天这一项，明天会再次出现；点击“结束”停止后续每天出现。以前未完成的长期任务保留在历史中，今天只显示今天这一项。重要标记和图文备注可延续到后续任务，历史快照与备份继续保留。
+
+![创建长期任务](docs/images/long-term-editor.png)
+
+![长期任务的今日完成与结束](docs/images/long-term-today.png)
+
+包含长期任务的数据或备份需要 1.0.6 或更新版本读取。既有 1.0.5 及更早的任务、图片和备份继续兼容。
 
 ## 2. 全年与月度日历：先安排未来
 
