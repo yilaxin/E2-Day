@@ -166,7 +166,7 @@ Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese
 
 **提醒会弹出系统通知吗？** 当前为 App 内提醒。关闭窗口即退出，不驻留后台，不设置开机启动，也不发送系统通知。
 
-**需要登录或上传个人记录吗？** 不需要。App 不把任务、事件或备份发送给资讯和节假日来源，联网用于读取公开内容。点击“阅读原文”会在浏览器打开来源网站。
+**需要登录或上传个人记录吗？** 2.0 使用各设备自己的本机账号，没有云账号。手机首次联网下载应用资源，之后本机离线记录；需要交换时自己导出、传送文件。电脑版联网读取公开资讯和节假日，不把个人记录发送给这些来源。
 
 **为什么打开程序失败？** 先确认选择了正确架构并完整解压，不能只拷贝一个 EXE；不要同时打开使用同一数据目录的多个实例。仍有问题可在 [Issues](https://github.com/yilaxin/E2-Day/issues) 提供版本、系统架构和报错文字，请勿公开个人任务数据库或备份。
 
@@ -206,8 +206,9 @@ NuGet 依赖固定版本，依赖与 CLI 缓存放在项目内 `.build`。依赖
 | `src/DailyRecord.Core` | 任务状态、重复日期、SQLite、备份、节假日和 RSS |
 | `src/DailyRecord.App` | WPF 页面、账号、事件编辑、月历、分享图片和界面验证入口 |
 | `src/DailyRecord.Mobile` | 独立手机应用、本机存储、离线缓存和文件交换 |
-| `tests/DailyRecord.Sync.Tests` | 隔离账号、本地 HTTPS、图片、提交回执、冲突与名称查询验证 |
-| `tests/mobile-rules.mjs` | 手机日期规则、通用备份、重新绑定与连续保存验证 |
+| `tests/mobile-rules.mjs` | 手机日期规则、通用文件校验与连续保存验证 |
+| `tests/mobile-file-import.mjs` | 两端合并协议、图片、原子提交与失败保留验证 |
+| `tests/mobile-offline-start.mjs` | 缓存导航与本机首屏不等待网络验证 |
 | `tests/DailyRecord.Tests` | 核心行为场景测试 |
 | `data/holidays` | 2024–2026 年中国放假调休数据及第三方许可证 |
 | `scripts` | 依赖获取、测试、两种架构打包和桌面快捷方式工具 |
