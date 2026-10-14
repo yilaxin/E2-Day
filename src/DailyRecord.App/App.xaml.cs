@@ -11,6 +11,9 @@ public partial class App : Application
     private FileStream? _instanceLock;
     private string _dataDirectory = "";
     private bool _smoke;
+    private AccountVault? _vault;
+    private AccountSession? _session;
+    private bool _switching;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -23,6 +26,9 @@ public partial class App : Application
             return index >= 0 && index + 1 < e.Args.Length ? e.Args[index + 1] : null;
         }
         var smokeOutput = Argument("--smoke-test");
+        if (Argument("--generate-mobile-assets") is { } assets)
+        { try { MobileAssets.Generate(assets); Shutdown(0); } catch { Shutdown(1); } return; }
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
         _smoke = smokeOutput is not null;
         _dataDirectory = Argument("--data-dir") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DailyRecord");
         DispatcherUnhandledException += (_, args) =>
@@ -41,7 +47,14 @@ public partial class App : Application
                 if (!_smoke) MessageBox.Show("E²-Day 已经打开，请使用已有窗口。", "E²-Day");
                 Shutdown(2); return;
             }
-            _store = new SqliteStore(_dataDirectory);
+            if (!_smoke)
+            {
+                _vault = new AccountVault(_dataDirectory);
+                _session = e.Args.Contains("--login") ? null : RememberedLogin.Load(_vault);
+                if (_session is null)
+                { var login = new AccountWindow(_vault); if (login.ShowDialog() != true) { Shutdown(); return; } _session = login.Session!; }
+            }
+            _store = new SqliteStore(_smoke ? _dataDirectory : _vault!.DataDirectory(_session!.AccountId));
             IClock clock = _smoke ? new PreviewClock() : new SystemClock();
             var service = new TaskService(_store, clock);
             var holidays = new HolidayService(Path.Combine(AppContext.BaseDirectory, "Data", "Holidays"), Path.Combine(_dataDirectory, "Holidays"));
@@ -52,7 +65,13 @@ public partial class App : Application
                 await SmokeTest.Run(window, service, holidays, (PreviewClock)clock, smokeOutput!);
                 Shutdown(0);
             }
-            else window.Show();
+            else
+            {
+                var account = _vault!.Accounts.Single(a => a.Id == _session!.AccountId);
+                window.ConfigureAccounts(_vault, account, SwitchAccount);
+                window.Closed += (_, _) => { if (!_switching) Shutdown(); };
+                window.Show();
+            }
         }
         catch (Exception ex)
         {
@@ -60,6 +79,16 @@ public partial class App : Application
             if (!_smoke) MessageBox.Show("无法打开 E²-Day。\n\n" + ex.Message + "\n\n数据目录：" + _dataDirectory, "启动失败", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
+    }
+    private void SwitchAccount()
+    {
+        if (_switching) return; _switching = true;
+        RememberedLogin.Clear(_dataDirectory);
+        if (_session is not null) _vault!.Revoke(_session.AccountId, _session.DeviceId);
+        MainWindow?.Close(); _store?.Dispose(); _store = null; _instanceLock?.Dispose(); _instanceLock = null;
+        var start = new System.Diagnostics.ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false };
+        start.ArgumentList.Add("--data-dir"); start.ArgumentList.Add(_dataDirectory); start.ArgumentList.Add("--login");
+        System.Diagnostics.Process.Start(start); Shutdown();
     }
     private void LogError(Exception exception)
     {

@@ -7,6 +7,20 @@ var root = rootArgument >= 0 && rootArgument + 1 < args.Length ? Path.GetFullPat
 Directory.CreateDirectory(root);
 var runRoot = Path.Combine(root, Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(runRoot);
+var exchangeArgument = Array.IndexOf(args, "--verify-exchange");
+if (exchangeArgument >= 0 && exchangeArgument + 1 < args.Length)
+{
+    var data = SqliteStore.ReadBackupData(Path.GetFullPath(args[exchangeArgument + 1]));
+    using var store = new SqliteStore(Path.Combine(runRoot, "browser-roundtrip"));
+    var service = new TaskService(store, new SystemClock());
+    service.ImportRecords(FileImport.Preview(service.State, data.State), new Dictionary<int, string>(), data.Images);
+    var exported = Path.Combine(runRoot, "roundtrip.json"); store.ExportPortableBackup(exported, service.State);
+    var roundtrip = SqliteStore.ReadBackupData(exported);
+    if (roundtrip.State.Tasks.Count != data.State.Tasks.Count || roundtrip.Images.Count != data.Images.Count)
+        throw new Exception("浏览器实际交换文件在电脑导入再导出后丢失记录或图片。");
+    Console.WriteLine($"PASS browser export imports into desktop and roundtrips: {roundtrip.State.Tasks.Count} tasks, {roundtrip.Images.Count} images");
+    return 0;
+}
 var passed = 0;
 var failed = 0;
 void Check(bool condition, string message) { if (!condition) throw new Exception(message); }
@@ -442,6 +456,9 @@ Test("无效图片引用保存回滚、数量限制及不再使用图片清理",
     task = f.Service.State.Tasks.Single(); f.Service.EditTask(task, task.Title, "", f.Clock.Today, false, []);
     try { f.Service.GetNoteImages([image.Id]); throw new Exception("无引用图片未清理"); } catch (InvalidDataException) { }
 });
+
+AccountAndSyncTests.Run(Test, runRoot);
+FileImportTests.Run(Test, runRoot);
 
 LongTermTaskTests.Run(Test, Check, () => NewFixture());
 

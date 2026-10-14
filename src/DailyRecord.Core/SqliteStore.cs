@@ -33,6 +33,9 @@ public sealed class SqliteStore : IDisposable
         using var command = _connection.CreateCommand();
         command.CommandText = "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS app_state (id INTEGER PRIMARY KEY CHECK(id=1), schema_version INTEGER NOT NULL, payload TEXT NOT NULL, updated_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS note_images (id TEXT PRIMARY KEY, file_name TEXT NOT NULL, data BLOB NOT NULL);";
         command.ExecuteNonQuery();
+        using var sync = _connection.CreateCommand();
+        sync.CommandText = "CREATE TABLE IF NOT EXISTS sync_clock(id INTEGER PRIMARY KEY CHECK(id=1),payload TEXT NOT NULL); CREATE TABLE IF NOT EXISTS sync_receipts(device TEXT NOT NULL,request TEXT NOT NULL,payload TEXT NOT NULL,PRIMARY KEY(device,request)); INSERT OR IGNORE INTO sync_clock(id,payload) VALUES(1,$clock)";
+        sync.Parameters.AddWithValue("$clock", JsonSerializer.Serialize(new SyncMetadata(), StateJson.Options)); sync.ExecuteNonQuery();
     }
 
     public AppState Load()
@@ -42,7 +45,7 @@ public sealed class SqliteStore : IDisposable
         return command.ExecuteScalar() is string json ? StateJson.Deserialize(json) : new AppState();
     }
 
-    public void Save(AppState state, IEnumerable<NoteImage>? images = null)
+    public void Save(AppState state, IEnumerable<NoteImage>? images = null, SyncCommit? syncCommit = null)
     {
         StateJson.Validate(state);
         var added = (images ?? []).DistinctBy(i => i.Id).ToList();
@@ -56,6 +59,7 @@ public sealed class SqliteStore : IDisposable
         }
         if (ImageIds(state).Any(id => !available.Contains(id))) throw new InvalidDataException("备注图片缺失，记录未保存。");
         var json = StateJson.Serialize(state);
+        var clock = GetSyncMetadata(); clock.Observe(Load(), state);
         using var transaction = _connection.BeginTransaction();
         foreach (var image in added)
         {
@@ -77,7 +81,29 @@ public sealed class SqliteStore : IDisposable
         command.Parameters.AddWithValue("$payload", json);
         command.Parameters.AddWithValue("$updated", DateTimeOffset.UtcNow.ToString("O"));
         command.ExecuteNonQuery();
+        using var sync = _connection.CreateCommand(); sync.Transaction = transaction;
+        sync.CommandText = "UPDATE sync_clock SET payload=$clock WHERE id=1";
+        sync.Parameters.AddWithValue("$clock", JsonSerializer.Serialize(clock, StateJson.Options)); sync.ExecuteNonQuery();
+        if (syncCommit is not null)
+        {
+            syncCommit.Epoch = clock.Epoch; syncCommit.Version = clock.Version;
+            using var receipt = _connection.CreateCommand(); receipt.Transaction = transaction;
+            receipt.CommandText = "INSERT INTO sync_receipts(device,request,payload) VALUES($device,$request,$payload)";
+            receipt.Parameters.AddWithValue("$device", syncCommit.DeviceHash); receipt.Parameters.AddWithValue("$request", syncCommit.RequestId);
+            receipt.Parameters.AddWithValue("$payload", JsonSerializer.Serialize(syncCommit, StateJson.Options)); receipt.ExecuteNonQuery();
+        }
         transaction.Commit();
+    }
+    public SyncMetadata GetSyncMetadata()
+    {
+        using var command = _connection.CreateCommand(); command.CommandText = "SELECT payload FROM sync_clock WHERE id=1";
+        return JsonSerializer.Deserialize<SyncMetadata>((string)command.ExecuteScalar()!, StateJson.Options)!;
+    }
+    public SyncCommit? GetSyncCommit(string device, string request)
+    {
+        using var command = _connection.CreateCommand(); command.CommandText = "SELECT payload FROM sync_receipts WHERE device=$device AND request=$request";
+        command.Parameters.AddWithValue("$device", device); command.Parameters.AddWithValue("$request", request);
+        return command.ExecuteScalar() is string json ? JsonSerializer.Deserialize<SyncCommit>(json, StateJson.Options) : null;
     }
 
     public IReadOnlyList<NoteImage> GetNoteImages(IEnumerable<string> ids)
@@ -97,6 +123,19 @@ public sealed class SqliteStore : IDisposable
         .Concat(state.Events.SelectMany(e => e.ImageIds)).Concat(state.Activities.SelectMany(a => a.ImageIds)).Distinct();
 
     public void ExportBackup(string path, AppState state) => WriteBackup(path, state, GetNoteImages(ImageIds(state)));
+    public void ExportPortableBackup(string path, AppState state)
+    {
+        var images = GetNoteImages(ImageIds(state)).ToList(); ValidateImages(state, images);
+        var envelope = new BackupEnvelope { Format = "E2DayExchange", Version = 1, ExportedAt = DateTimeOffset.UtcNow, Payload = StateJson.Serialize(state), Images = images };
+        envelope.Sha256 = PortableHash(envelope);
+        var text = JsonSerializer.Serialize(envelope, StateJson.Options);
+        if (Encoding.UTF8.GetByteCount(text) > MaxBackupBytes) throw new InvalidDataException("备份超过 512 MB。");
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        var temporary = Path.GetFullPath(path) + ".tmp";
+        try { File.WriteAllText(temporary, text, new UTF8Encoding(false)); File.Move(temporary, Path.GetFullPath(path), true); }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+    }
+    private static string PortableHash(BackupEnvelope envelope) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(envelope.Payload + "\n" + string.Join("\n", envelope.Images.Select(i => i.Id).Order(StringComparer.Ordinal)))));
 
     private static string BackupHash(BackupEnvelope envelope) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
         envelope.Version == 1 ? envelope.Payload : envelope.Payload + "\n" + JsonSerializer.Serialize(envelope.Images, StateJson.Options))));
@@ -122,11 +161,12 @@ public sealed class SqliteStore : IDisposable
         if (!file.Exists || file.Length > MaxBackupBytes) throw new InvalidDataException("备份不存在或超过 512 MB。");
         var envelope = JsonSerializer.Deserialize<BackupEnvelope>(File.ReadAllText(path, Encoding.UTF8), StateJson.Options)
             ?? throw new InvalidDataException("备份文件无效。");
-        if (envelope.Format != "DailyRecordBackup" || envelope.Version is not (1 or 2) || envelope.Payload is null || envelope.Images is null ||
-            !string.Equals(envelope.Sha256, BackupHash(envelope), StringComparison.OrdinalIgnoreCase))
+        var portable = (envelope.Format is "E2DayMobileBackup" or "E2DayExchange") && envelope.Version == 1;
+        if ((!portable && (envelope.Format != "DailyRecordBackup" || envelope.Version is not (1 or 2))) || envelope.Payload is null || envelope.Images is null || envelope.Images.Any(i => i is null) ||
+            !string.Equals(envelope.Sha256, portable ? PortableHash(envelope) : BackupHash(envelope), StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("备份版本或完整性校验失败，现有数据未更改。");
         var state = StateJson.Deserialize(envelope.Payload);
-        if (envelope.Version == 1 && envelope.Images.Count != 0) throw new InvalidDataException("旧版备份不能包含图片。");
+        if (!portable && envelope.Version == 1 && envelope.Images.Count != 0) throw new InvalidDataException("旧版备份不能包含图片。");
         ValidateImages(state, envelope.Images);
         return new(state, envelope.Images);
     }

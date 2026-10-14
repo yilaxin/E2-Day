@@ -66,6 +66,8 @@ public partial class MainWindow
     private void BuildSettings()
     {
         Header("让工具适合你的习惯", "偏好设置", "记录保存在这台电脑上，任务和日历可离线使用。");
+        BuildAccountSettings();
+        BuildFileExchange();
         var normal = new TextBox { Text = _service.State.Settings.NormalDays.ToString(), Width = 90 };
         var important = new TextBox { Text = _service.State.Settings.ImportantDays.ToString(), Width = 90 };
         var very = new TextBox { Text = _service.State.Settings.VeryImportantDays.ToString(), Width = 90 };
@@ -85,7 +87,7 @@ public partial class MainWindow
         PageBody.Children.Add(Ui.Card(reminder));
 
         var data = Ui.Stack(Ui.Text("数据与备份", 18, bold: true), Ui.Text("自动保存；应用运行当天更新一份备份，保留最近 30 份。恢复前会备份当前记录。", 12, Ui.Muted));
-        var path = Ui.Text(_store.DataDirectory, 11, Ui.Muted); path.Margin = new Thickness(0, 12, 0, 12); data.Children.Add(path);
+        var path = Ui.Text(_smoke ? "示例数据目录（隔离）" : _store.DataDirectory, 11, Ui.Muted); path.Margin = new Thickness(0, 12, 0, 12); data.Children.Add(path);
         var actions = Ui.Row(Ui.Button("导出备份", ExportBackup, accent: true), Ui.Button("从备份恢复", ImportBackup), Ui.Button("打开备份文件夹", () =>
         {
             Directory.CreateDirectory(_store.BackupDirectory);
@@ -116,14 +118,14 @@ public partial class MainWindow
         { var label = Ui.Text($"{source.Name}  ·  {source.Language}", 11, Ui.Muted); label.Margin = new Thickness(0, 7, 0, 0); news.Children.Add(label); }
         var refresh = Ui.Button("刷新资讯", () => _ = RefreshNewsAsync(true)); refresh.HorizontalAlignment = HorizontalAlignment.Left;
         refresh.Margin = new Thickness(0, 13, 0, 0); news.Children.Add(refresh); PageBody.Children.Add(Ui.Card(news));
-        PageBody.Children.Add(Ui.Text("E²-Day 1.0 · Explore Everyday Day · 探索每一天", 11, Ui.Muted));
+        PageBody.Children.Add(Ui.Text("E²-Day 2.0.0 · Explore Everyday Day · 探索每一天", 11, Ui.Muted));
     }
 
     private void ExportBackup()
     {
         var dialog = new SaveFileDialog { Title = "导出 E²-Day 备份", Filter = "E²-Day 备份 (*.json)|*.json", FileName = $"E²-Day备份-{_service.Today:yyyy-MM-dd}.json" };
         if (dialog.ShowDialog(this) != true) return;
-        try { _service.ExportBackup(dialog.FileName); MessageBox.Show(this, "备份已导出。", "导出完成"); }
+        try { _store.ExportPortableBackup(dialog.FileName, _service.State); MessageBox.Show(this, "通用备份已导出，可在电脑或手机恢复。", "导出完成"); }
         catch (Exception ex) { MessageBox.Show(this, ex.Message, "导出失败"); }
     }
     private void ImportBackup()

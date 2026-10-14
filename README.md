@@ -4,9 +4,9 @@
 
 # E²-Day · 探索每一天
 
-**Explore Everyday Day** — 把全年安排、今天要做的事和已经完成的事，放进同一个 Windows 桌面 App。
+**Explore Everyday Day** — 把全年安排、今天要做的事和已经完成的事，放进同一个 Windows 桌面 App，并通过手机主屏幕应用随身使用。
 
-E²-Day 是一款中文个人任务与日历工具，适合记录工作计划、学习清单、生日纪念日和日常琐事。你可以先在日历里安排未来，再在今日清单里处理到期事项，最后通过历史记录回看完成情况。个人记录保存在本机，任务与日历可以离线使用，无需注册 App 账号。
+E²-Day 是一款中文个人任务与日历工具，适合记录工作计划、学习清单、生日纪念日和日常琐事。你可以先在日历里安排未来，再在今日清单里处理到期事项，最后通过历史记录回看完成情况。2.0 开发版增加本机账号、独立手机主屏幕应用和手动文件交换。手机自己添加和保存任务，电脑与手机各自离线使用，需要交换记录时导出文件，在另一端预览并合并。
 
 **[下载最新版本](https://github.com/yilaxin/E2-Day/releases/latest)** · **[详细使用说明](使用说明.md)** · **[反馈问题](https://github.com/yilaxin/E2-Day/issues)**
 
@@ -18,7 +18,7 @@ Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese
 
 ## 下载与开始使用
 
-当前版本：**1.0.6**。程序采用免安装、自包含的文件夹发布方式，下载包内已包含所需的 .NET 运行依赖。
+公开稳定版：**1.0.6**。**2.0.0 候选版**已改为独立手机应用与文件交换，尚未正式发布；下方 Windows 下载为 1.0.6。程序采用免安装、自包含的文件夹发布方式，下载包内已包含所需的 .NET 运行依赖。
 
 | 你的电脑 | 下载文件 |
 | --- | --- |
@@ -30,12 +30,32 @@ Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese
 3. 双击 `DailyRecord.exe`，打开后显示的 App 名称是 **E²-Day**。
 4. 在“今日清单”输入一件事，按 Enter 添加；需要未来日期或重复安排时，点击“安排事件”。
 
-这是 Windows 桌面程序，当前没有 macOS、Linux、手机或网页版，也没有 32 位 Windows 发布包。发布包未做数字签名。Releases 页面还提供 `SHA256SUMS.txt`，用于核对下载文件完整性。
+电脑端为 Windows 程序，没有 macOS、Linux 或 32 位 Windows 发布包。2.0 手机候选入口：[打开手机应用](https://yilaxin.github.io/E2-Day/mobile/)。首次联网准备完成后可添加到手机桌面，之后离线记录；华为、安卓与 iPhone 的新独立版本真机验证状态见[手机验收清单](docs/MOBILE-CHECKLIST.md)。Windows 发布包未做数字签名，Releases 提供 SHA256SUMS.txt 校验文件。
+
+## 2.0 候选版：独立手机应用与文件交换
+
+电脑和手机分别创建自己的本机账号、密码与离线恢复码。首次创建电脑账号会先备份旧版记录，再迁移到第一个账号；其余账号从空白清单开始。账号和密码不在交换文件中，两端可以使用不同账号名。
+
+![本机账号登录](docs/images/account-login.png)
+
+手机可新增任务，编辑日期、备注和图片，标记重要、完成或撤销，查看月历。电脑保留重复规则、全年总览、历史搜索、分享图片和资讯等完整功能。
+
+![独立手机任务示例](docs/images/mobile-independent-today.png)
+
+- 手机通过固定 HTTPS 页面安装，不需要电脑开机、同一 Wi-Fi、配对码或本地连接证书。
+- 电脑“偏好设置 → 手机与文件交换”、手机“账号 → 文件交换”可导出和导入交换文件，包含任务、事件、历史与被引用的图片。
+- 导入先预览：保留双方独有记录，相同记录去重，同一条记录不同则选择“保留本机”或“采用文件”。采用整条记录的版本；文件中缺少某条任务不会删除本机任务。
+- 确认合并前保留本机副本；文件损坏、缺图片、空间不足或预览后本机记录变化会拒绝导入，保留原记录。
+- 记录只保存在各自设备，没有自动同步或云端账号。请保留手机站点数据，并定期把交换文件另存为备份。
+
+安装和文件交换步骤见[使用说明](使用说明.md)。手机候选页面不等同于已完成真机验收的正式交付。
 
 ## 功能一览
 
 | 功能 | 你可以做什么 |
 | --- | --- |
+| 本机账号（2.0 候选版） | 各设备独立记录、密码登录、离线恢复码 |
+| 手机与文件交换（2.0 候选版） | 主屏幕图标、独立离线记录、含图文件导出、预览合并 |
 | 今日清单 | 快速添加任务，标记重要，完成或撤销，编辑、改期、取消和恢复 |
 | 备注图片 | 在任务或事件备注中上传多图、粘贴截图，点击缩略图放大，图片随历史与备份保存 |
 | 逾期延续 | 未完成任务继续留在待办里，显示原定日期和逾期天数 |
@@ -160,7 +180,7 @@ Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese
 # 获取依赖并使用项目内缓存
 ./scripts/Get-Dependencies.ps1
 . ./scripts/Environment.ps1
-dotnet build src/DailyRecord.App/DailyRecord.App.csproj
+dotnet build src/DailyRecord.App/DailyRecord.App.csproj -m:1 -p:UseSharedCompilation=false
 
 # 核心行为测试与真实 WPF 控件回归
 ./scripts/Test.ps1
@@ -177,12 +197,17 @@ dotnet build src/DailyRecord.App/DailyRecord.App.csproj
 ./scripts/Test.ps1 -Published -RuntimeIdentifier win-x64
 ```
 
+构建产物按版本保存在 `artifacts/releases/v<版本>/programs/`，候选 ZIP 在同版本目录；不会覆盖正在使用的旧程序目录。
+
 NuGet 依赖固定版本，依赖与 CLI 缓存放在项目内 `.build`。依赖脚本从 NuGet 官方接口获取所需包，随后使用项目内离线包源还原。测试采用隔离数据目录和固定示例日期，不读取正常个人数据。
 
 | 目录 | 内容 |
 | --- | --- |
 | `src/DailyRecord.Core` | 任务状态、重复日期、SQLite、备份、节假日和 RSS |
-| `src/DailyRecord.App` | WPF 页面、事件编辑、月历、分享图片和界面验证入口 |
+| `src/DailyRecord.App` | WPF 页面、账号、事件编辑、月历、分享图片和界面验证入口 |
+| `src/DailyRecord.Mobile` | 独立手机应用、本机存储、离线缓存和文件交换 |
+| `tests/DailyRecord.Sync.Tests` | 隔离账号、本地 HTTPS、图片、提交回执、冲突与名称查询验证 |
+| `tests/mobile-rules.mjs` | 手机日期规则、通用备份、重新绑定与连续保存验证 |
 | `tests/DailyRecord.Tests` | 核心行为场景测试 |
 | `data/holidays` | 2024–2026 年中国放假调休数据及第三方许可证 |
 | `scripts` | 依赖获取、测试、两种架构打包和桌面快捷方式工具 |

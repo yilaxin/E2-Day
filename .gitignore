@@ -14,3 +14,7 @@ TestResults/
 *.p12
 *.key
 /AGENTS.md
+*.protected
+**/Accounts/
+**/LocalSync/
+**/accounts.json

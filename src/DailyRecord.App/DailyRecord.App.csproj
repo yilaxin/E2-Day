@@ -9,7 +9,7 @@
     <AssemblyTitle>E²-Day</AssemblyTitle>
     <Description>Explore Everyday Day · 探索每一天</Description>
     <ApplicationIcon>Assets/e2-day.ico</ApplicationIcon>
-    <Version>1.0.6</Version>
+    <Version>2.0.0</Version>
     <PublishTrimmed>false</PublishTrimmed>
   </PropertyGroup>
   <ItemGroup>
@@ -17,6 +17,7 @@
     <Resource Include="Assets/e2-day.ico" />
     <Content Include="Assets/e2-day.ico" Link="e2-day.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <ProjectReference Include="../DailyRecord.Core/DailyRecord.Core.csproj" />
+    <Content Include="../DailyRecord.Mobile/**" Link="Mobile/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="../../data/holidays/*.json" Link="Data/Holidays/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../../data/holidays/LICENSE" Link="Data/Holidays/LICENSE" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

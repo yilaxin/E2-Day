@@ -14,6 +14,7 @@ internal static partial class SmokeTest
     public static async Task Run(MainWindow window, TaskService service, HolidayService holidays, PreviewClock clock, string outputDirectory)
     {
         Directory.CreateDirectory(outputDirectory);
+        VerifyAccountFlow(outputDirectory);
         if (service.State.Tasks.Count == 0)
         {
             service.AddTask("完成项目的第一版需求整理", "把想法变成可以执行的下一步。", service.Today, true);
@@ -74,7 +75,59 @@ internal static partial class SmokeTest
         var editorRoot = (FrameworkElement)editor.Content;
         Render(editorRoot, 560, 850, Path.Combine(outputDirectory, "event-editor.png"));
         File.WriteAllText(Path.Combine(outputDirectory, "result.txt"),
-            "PASS: WPF root layout; 4 page renders; event editor render; mark/unmark important; complete/undo; viewed/undo; persisted state; calendar control reuse, task changes, completion, rescheduling, cancellation, backup restore, day rollover and leap-year switching; month zoom, task previews, completion fading, overflow, month/year navigation and return to overview; task share image, empty/long lists, filtering, native bitmap + PNG data, copy button and clipboard contention retries; note image upload callback, PNG/JPEG import, orientation, scaling, thumbnails, preview, draft isolation, removal, invalid files, size/count limits and history images.\nScreenshots use explicit preview data in an isolated data directory. Clipboard tests use a recording backend and leave the system clipboard untouched. Image picker tests inject file paths and do not open the system dialog.\nRuntime: " + System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory());
+            "PASS: account creation and login callbacks; legacy migration and backup; local account settings and file exchange entries; WPF root layout; 4 page renders; event editor render; mark/unmark important; complete/undo; viewed/undo; persisted state; calendar control reuse, task changes, completion, rescheduling, cancellation, backup restore, day rollover and leap-year switching; month zoom, task previews, completion fading, overflow, month/year navigation and return to overview; task share image, empty/long lists, filtering, native bitmap + PNG data, copy button and clipboard contention retries; note image upload callback, PNG/JPEG import, orientation, scaling, thumbnails, preview, draft isolation, removal, invalid files, size/count limits and history images.\nScreenshots use explicit preview data in an isolated data directory. Clipboard tests use a recording backend and leave the system clipboard untouched. Image picker tests inject file paths and do not open the system dialog.\nRuntime: " + System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory());
+    }
+
+    private static void VerifyAccountFlow(string outputDirectory)
+    {
+        var root = Path.Combine(outputDirectory, "account-fixture", Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
+        using (var legacy = new SqliteStore(root))
+        {
+            var oldService = new TaskService(legacy, new PreviewClock()); oldService.AddTask("旧版迁移示例", "迁移前备份，记录继续保留。", oldService.Today);
+        }
+        var vault = new AccountVault(root); var create = new AccountWindow(vault, smoke: true);
+        Render((FrameworkElement)create.Content, 460, 650, Path.Combine(outputDirectory, "account-create.png"));
+        T Field<T>(Window dialog, string tag) where T : FrameworkElement => Descendants(dialog.Content as DependencyObject ?? dialog).OfType<T>().Single(control => Equals(control.Tag, tag));
+        Field<TextBox>(create, "account-name").Text = "账号验证示例";
+        Field<PasswordBox>(create, "account-password").Password = "example-password";
+        Field<PasswordBox>(create, "account-confirm").Password = "example-password";
+        Field<Button>(create, "account-next").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        if (create.Session is null || vault.Accounts.Count != 1) throw new InvalidOperationException("账号创建按钮未完成创建。");
+        using (var migrated = new SqliteStore(vault.DataDirectory(create.Session.AccountId)))
+            if (migrated.Load().Tasks.Single().Title != "旧版迁移示例" || !Directory.GetFiles(Path.Combine(root, "Backups"), "账号迁移前-*.json").Any())
+                throw new InvalidOperationException("账号迁移未保留旧版记录及备份。");
+        vault.Revoke(create.Session.AccountId, create.Session.DeviceId);
+        var login = new AccountWindow(vault, smoke: true);
+        Render((FrameworkElement)login.Content, 460, 650, Path.Combine(outputDirectory, "account-login.png"));
+        Field<PasswordBox>(login, "account-password").Password = "wrong-password";
+        Field<Button>(login, "account-next").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        if (login.Session is not null) throw new InvalidOperationException("错误密码仍可通过界面登录。");
+        Field<PasswordBox>(login, "account-password").Password = "example-password";
+        Field<Button>(login, "account-next").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        if (login.Session is null) throw new InvalidOperationException("正确密码无法通过界面登录。");
+        using var profileStore = new SqliteStore(vault.DataDirectory(login.Session.AccountId));
+        var service = new TaskService(profileStore, new PreviewClock());
+        var holidays = new HolidayService(Path.Combine(AppContext.BaseDirectory, "Data", "Holidays"), Path.Combine(root, "Holidays"));
+        var window = new MainWindow(service, profileStore, holidays, smoke: true);
+        window.ConfigureAccounts(vault, vault.Accounts.Single(), () => { }); window.Navigate(PageKind.Settings); Prepare(window);
+        if (!Descendants(window.Content as DependencyObject ?? window).OfType<Button>().Any(b => b.Content?.ToString() == "导入交换文件"))
+            throw new InvalidOperationException("本机账号没有显示文件交换入口。");
+        window.Show();
+        var incoming = SyncMerge.Clone(service.State); incoming.Tasks[0].Title = "从手机文件带来的修改";
+        var added = System.Text.Json.JsonSerializer.Deserialize<TaskItem>(System.Text.Json.JsonSerializer.Serialize(incoming.Tasks[0], StateJson.Options), StateJson.Options)!;
+        added.Id = Guid.NewGuid().ToString("N"); added.Title = "手机上独立添加的任务"; incoming.Tasks.Add(added);
+        var plan = FileImport.Preview(service.State, incoming); var fingerprint = FileImport.Fingerprint(service.State);
+        var review = window.CreateImportPreview(plan, []); review.Show(); Prepare(review);
+        Click(review, "file-import-confirm");
+        if (FileImport.Fingerprint(service.State) != fingerprint) throw new InvalidOperationException("未选择版本就改变了记录。");
+        Field<RadioButton>(review, "file-import-0-incoming").IsChecked = true;
+        Render((FrameworkElement)review.Content, 650, 600, Path.Combine(outputDirectory, "file-import-preview.png"));
+        Click(review, "file-import-confirm");
+        if (service.State.Tasks.Count != 2 || service.State.Tasks.All(task => task.Title != "从手机文件带来的修改"))
+            throw new InvalidOperationException("文件合并预览没有应用选择或保留新增任务。");
+        window.Navigate(PageKind.Settings); Prepare(window);
+        Render((FrameworkElement)window.Content, 1400, 940, Path.Combine(outputDirectory, "account-settings.png"));
+        window.Close(); create.Close(); login.Close();
     }
 
     private static async Task VerifyNoteImages(MainWindow window, TaskService service, HolidayService holidays, string outputDirectory)
@@ -341,13 +394,13 @@ internal static partial class SmokeTest
         File.WriteAllLines(Path.Combine(outputDirectory, "calendar-performance.txt"), measurements);
     }
 
-    private static void Click(MainWindow window, string tag)
+    private static void Click(Window window, string tag)
     {
         Prepare(window);
         var button = FindButton(window, tag);
         button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
     }
-    private static Button FindButton(MainWindow window, string tag) => Descendants(window).OfType<Button>()
+    private static Button FindButton(Window window, string tag) => Descendants(window).OfType<Button>()
         .FirstOrDefault(b => Equals(b.Tag, tag)) ?? throw new InvalidOperationException("没有找到 UI 按钮：" + tag);
     private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
     {
@@ -355,7 +408,7 @@ internal static partial class SmokeTest
         foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
             foreach (var descendant in Descendants(child)) yield return descendant;
     }
-    private static void Prepare(MainWindow window)
+    private static void Prepare(Window window)
     {
         window.ApplyTemplate();
         var root = (FrameworkElement)window.Content;

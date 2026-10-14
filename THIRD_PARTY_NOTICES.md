@@ -27,3 +27,7 @@
 - Microsoft Research：https://www.microsoft.com/en-us/research/blog/feed/
 
 程序不抓取文章全文，不调用第三方自动转译服务，不将个人任务、事件或备份发送给资讯来源。
+
+## 手机资源
+
+手机页面为项目自带静态资源，不使用远程 CDN。农历重复日期表由 .NET ChineseLunisolarCalendar 生成，图标沿用本项目 logo。独立手机版本使用浏览器的 IndexedDB、Web Crypto 与 Service Worker；应用不再包含 ASP.NET Core / Kestrel 局域网连接服务。

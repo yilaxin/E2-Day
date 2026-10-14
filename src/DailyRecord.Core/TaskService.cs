@@ -56,6 +56,7 @@ public sealed partial class TaskService
         if (existing is not null) return existing;
         var task = new TaskItem
         {
+            Id = OccurrenceId(ev.Id, occurrence),
             EventId = ev.Id, OccurrenceDate = occurrence, ScheduledDate = occurrence,
             OriginalScheduledDate = occurrence, Title = ev.Title, Notes = ev.Notes,
             ImageIds = [.. ev.ImageIds], IsImportant = ev.IsImportant,
@@ -371,6 +372,30 @@ public sealed partial class TaskService
         EnsureUpcoming();
         Save();
     }
+
+    public string ImportRecords(FileImportPlan plan, IReadOnlyDictionary<int, string> choices, IEnumerable<NoteImage> images)
+    {
+        if (FileImport.Fingerprint(State) != plan.CurrentFingerprint) throw new InvalidDataException("当前记录已有变化，请重新预览导入文件。");
+        var merged = plan.Resolve(choices); merged.News = State.News;
+        var preparedImages = images.ToList(); foreach (var image in preparedImages) image.Validate();
+        var backup = _store.BeforeRestoreBackup(State);
+        try { State = merged; EnsureUpcoming(); Save(preparedImages); }
+        catch { State = _store.Load(); throw; }
+        return backup;
+    }
+
+    public SyncMetadata SyncMetadata => _store.GetSyncMetadata();
+    public SyncCommit? GetSyncCommit(string device, string request) => _store.GetSyncCommit(device, request);
+    public void ApplySync(AppState state, IEnumerable<NoteImage>? images = null, SyncCommit? commit = null)
+    {
+        StateJson.Validate(state);
+        _store.Save(state, images, commit);
+        State = state;
+        EnsureUpcoming();
+        Save();
+    }
+    public static string OccurrenceId(string eventId, DateOnly day) => Convert.ToHexString(
+        System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(eventId + ":" + day.ToString("yyyy-MM-dd"))))[..32].ToLowerInvariant();
 
     private ActivityRecord Snapshot(TaskItem task, ActivityKind kind) => new()
     {

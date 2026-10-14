@@ -1,7 +1,8 @@
 param(
-    [ValidateSet('Publish','Verify')][string]$Mode = 'Publish',
+    [ValidateSet('Publish','Verify','Preview','Pages')][string]$Mode = 'Publish',
     [string]$Version = '',
-    [string]$CommitMessage = ''
+    [string]$CommitMessage = '',
+    [string]$ReleaseDirectory = ''
 )
 $ErrorActionPreference = 'Stop'
 $projectDirectory = Split-Path -Parent $PSScriptRoot
@@ -15,7 +16,8 @@ if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw '版本号需为 major.minor.p
 if ($Mode -eq 'Publish' -and $Version -ne $appVersion) { throw '发布版本与 App 源码版本不一致。' }
 if (-not $CommitMessage) { $CommitMessage = "Publish E2-Day $Version with updated Windows packages and documentation" }
 $versionTag = "v$Version"
-$releaseDirectory = Join-Path $projectDirectory "artifacts/releases/$versionTag"
+$releaseDirectory = if ($ReleaseDirectory) { [IO.Path]::GetFullPath((Join-Path $projectDirectory $ReleaseDirectory)) } else { Join-Path $projectDirectory "artifacts/releases/$versionTag" }
+if (!$releaseDirectory.StartsWith($projectDirectory.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) { throw '发布目录必须位于项目内。' }
 $releaseNotesPath = Join-Path $projectDirectory "docs/RELEASE-$versionTag.md"
 $assetNames = @("E2-Day-$versionTag-win-arm64.zip", "E2-Day-$versionTag-win-x64.zip", 'SHA256SUMS.txt')
 $responseDirectory = Join-Path $projectDirectory '.build/github'
@@ -83,12 +85,14 @@ try {
     $profile = Invoke-GitHubApi -Path '/user'
     if ($profile.login -cne $ownerName) { throw 'GitHub 授权账号与目标账号不一致，停止上传。' }
     Write-Output "GitHub 账号验证成功：$($profile.login)"
-    if ($Mode -eq 'Publish') {
+    if ($Mode -in @('Publish','Preview')) {
+      if ($Mode -eq 'Publish') {
         foreach ($assetName in $assetNames) {
             if (-not (Test-Path -LiteralPath (Join-Path $releaseDirectory $assetName))) { throw "缺少发布附件：$assetName" }
         }
         if (-not (Test-Path -LiteralPath $releaseNotesPath)) { throw '缺少本版发布说明。' }
         $releaseBody = Get-Content -LiteralPath $releaseNotesPath -Raw -Encoding UTF8
+        if ($releaseBody -match '发布准备状态：候选版') { throw '当前仍为候选版。先完成手机验收并更新对应发布说明，再发布正式版本。' }
         $releaseTitle = (($releaseBody -split '\r?\n' | Select-Object -First 1) -replace '^#\s+', '').Trim()
         if (-not $releaseTitle) { throw '发布说明缺少标题。' }
         $expectedChecksums = @{}
@@ -99,6 +103,7 @@ try {
             $actualHash = (Get-FileHash -LiteralPath (Join-Path $releaseDirectory $packageName) -Algorithm SHA256).Hash.ToLowerInvariant()
             if ($expectedChecksums[$packageName] -ne $actualHash) { throw "本地程序包校验失败：$packageName" }
         }
+      }
         try { $repository = Invoke-GitHubApi -Path "/repos/$repoPath" }
         catch {
             if ($script:lastStatus -ne 404) { throw }
@@ -124,13 +129,13 @@ try {
             git add -- .gitignore CHANGELOG.md Directory.Build.props LICENSE NuGet.Config README.md THIRD_PARTY_NOTICES.md data docs scripts src tests 使用说明.md 需求说明.md 验证记录.md
             if ($LASTEXITCODE -ne 0) { throw '源码准备失败。' }
             $stagedFiles = @(git -c core.quotepath=false diff --cached --name-only)
-            if ($stagedFiles | Where-Object { $_ -match '(^|/)(\.build|artifacts|\.env|bin|obj)(/|$)|\.(db|pfx|p12|key|zip|log)$' }) { throw '暂存内容含非发布文件，停止上传。' }
+            if ($stagedFiles | Where-Object { $_ -match '(^|/)(\.build|artifacts|\.env|bin|obj|Accounts|LocalSync)(/|$)|\.(db|db-shm|db-wal|pfx|p12|key|zip|log|protected)$|(^|/)(accounts\.json|session\.lock)$' }) { throw '暂存内容含非发布文件，停止上传。' }
             if ($stagedFiles.Count -gt 0) {
                 git commit -m $CommitMessage
                 if ($LASTEXITCODE -ne 0) { throw '源码提交失败。' }
             }
-            $sourceBranch = git symbolic-ref --quiet --short HEAD
-            if ($LASTEXITCODE -ne 0) { throw '请在功能分支或主分支上发布。' }
+            git branch -M main
+            if ($LASTEXITCODE -ne 0) { throw '无法设置发布主分支。' }
             $configuredOrigin = git remote get-url origin 2>$null
             if ($configuredOrigin) {
                 if ($configuredOrigin -ne "https://github.com/$repoPath.git") { throw '已有远程仓库与目标不同，停止上传。' }
@@ -139,23 +144,29 @@ try {
                 if ($LASTEXITCODE -ne 0) { throw '无法记录发布仓库地址。' }
             }
             $commitSha = (git rev-parse HEAD).Trim()
+          if ($Mode -eq 'Publish') {
             if (-not (git tag --list $versionTag)) {
                 git tag -a $versionTag -m "E2-Day $Version public release"
                 if ($LASTEXITCODE -ne 0) { throw '版本标签创建失败。' }
             }
             $tagCommit = (git rev-list -n 1 $versionTag).Trim()
             if ($tagCommit -ne $commitSha) { throw '版本标签与当前发布提交不一致，停止上传。' }
+          }
             Write-Output '正在上传源码、说明和功能截图。'
-            git -c credential.username=$ownerName -c credential.interactive=never push -u origin "HEAD:refs/heads/main" "refs/tags/$versionTag"
+            if ($Mode -eq 'Publish') { git -c credential.username=$ownerName -c credential.interactive=never push -u origin main "refs/tags/$versionTag" }
+            else { git -c credential.username=$ownerName -c credential.interactive=never push -u origin main }
             if ($LASTEXITCODE -ne 0) { throw '源码上传失败。' }
+          if ($Mode -eq 'Publish') {
             git archive --format=zip --output (Join-Path $releaseDirectory "E2-Day-$versionTag-source.zip") HEAD
             if ($LASTEXITCODE -ne 0) { throw '本地源码压缩包生成失败。' }
+          }
         } finally { Pop-Location }
         $null = Invoke-GitHubApi -Method PATCH -Path "/repos/$repoPath" -Body @{
             default_branch = 'main'
             description = 'E²-Day · 探索每一天：Windows 任务与全年/月度日历 App，支持备注图片、公历/农历重复、提前提醒、完成历史、本地备份和分享图。Daily task planner for Windows x64/ARM64.'
             homepage = "https://github.com/$repoPath/releases/latest"
         }
+      if ($Mode -eq 'Publish') {
         $release = @(Invoke-GitHubApi -Path "/repos/$repoPath/releases?per_page=100") | Where-Object { $_.tag_name -eq $versionTag } | Select-Object -First 1
         if (-not $release) {
             try {
@@ -210,6 +221,16 @@ try {
         $release = Invoke-GitHubApi -Method PATCH -Path "/repos/$repoPath/releases/$($release.id)" -Body @{ tag_name = $versionTag; target_commitish = $commitSha; draft = $false; prerelease = $false; make_latest = 'true' }
         if ($release.tag_name -ne $versionTag -or $release.draft) { throw '发布页版本标签或公开状态与目标不一致。' }
         Write-Output "发布成功：$($release.html_url)"
+      }
+    }
+    if ($Mode -eq 'Pages') {
+        try { $pages = Invoke-GitHubApi -Path "/repos/$repoPath/pages" }
+        catch {
+            if ($script:lastStatus -ne 404) { throw }
+            $pages = Invoke-GitHubApi -Method POST -Path "/repos/$repoPath/pages" -Body @{ build_type = 'legacy'; source = @{ branch = 'main'; path = '/docs' } }
+        }
+        if ($pages.source.branch -ne 'main' -or $pages.source.path -ne '/docs' -or $pages.cname) { throw '现有 Pages 配置与本项目静态应用目录不同，保留现有配置并停止。' }
+        Write-Output "静态应用托管：$($pages.html_url)；状态：$($pages.status)"
     }
     $repository = Invoke-GitHubApi -Path "/repos/$repoPath"
     $latestRelease = Invoke-GitHubApi -Path "/repos/$repoPath/releases/latest"
