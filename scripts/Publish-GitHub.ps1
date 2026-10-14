@@ -230,7 +230,13 @@ try {
             $pages = Invoke-GitHubApi -Method POST -Path "/repos/$repoPath/pages" -Body @{ build_type = 'legacy'; source = @{ branch = 'main'; path = '/docs' } }
         }
         if ($pages.source.branch -ne 'main' -or $pages.source.path -ne '/docs' -or $pages.cname) { throw '现有 Pages 配置与本项目静态应用目录不同，保留现有配置并停止。' }
+        try { $pageBuild = Invoke-GitHubApi -Path "/repos/$repoPath/pages/builds/latest" }
+        catch {
+            if ($script:lastStatus -ne 404) { throw }
+            $pageBuild = Invoke-GitHubApi -Method POST -Path "/repos/$repoPath/pages/builds"
+        }
         Write-Output "静态应用托管：$($pages.html_url)；状态：$($pages.status)"
+        Write-Output "最新静态构建：$($pageBuild.status)；提交：$($pageBuild.commit)；错误：$($pageBuild.error.message)"
     }
     $repository = Invoke-GitHubApi -Path "/repos/$repoPath"
     $latestRelease = Invoke-GitHubApi -Path "/repos/$repoPath/releases/latest"

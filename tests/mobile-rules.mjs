@@ -26,6 +26,8 @@ if(process.argv[2]){
  assert.equal(await portableHash(backup),backup.Sha256);
  const state=validateMobileState(JSON.parse(backup.Payload));
  assert.equal(state.Tasks[0].Title,'通用备份示例');
+ const invalidTime=structuredClone(state);invalidTime.Tasks[0].CreatedAt='not-a-time';assert.throws(()=>validateMobileState(invalidTime));
+ invalidTime.Tasks[0].CreatedAt='2026-10-14';assert.throws(()=>validateMobileState(invalidTime));
  state.Tasks[0].ScheduledDate='2026-02-30';assert.throws(()=>validateMobileState(state));
  console.log('PASS portable backup: desktop hash matches browser implementation, PNG references preserved, invalid dates rejected before restore');
 }
