@@ -2,6 +2,8 @@
 **/bin/
 **/obj/
 artifacts/
+/output/
+/tmp/pdfs/
 .vs/
 *.user
 *.db

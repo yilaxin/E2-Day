@@ -12,7 +12,7 @@ if (!$manifest) { throw '缺少公开校验文件。' }
 Invoke-WebRequest -Uri $manifest.browser_download_url -OutFile (Join-Path $output 'SHA256SUMS.txt') -HttpVersion 1.1
 $lines=@()
 foreach ($line in Get-Content (Join-Path $output 'SHA256SUMS.txt')) {
-    if ($line -notmatch '^([a-fA-F0-9]{64})  ([A-Za-z0-9._-]+\.zip)$') { throw '公开校验文件格式无效。' }
+    if ($line -notmatch '^([a-fA-F0-9]{64})  ([A-Za-z0-9._-]+\.(?:zip|pdf))$') { throw '公开校验文件格式无效。' }
     $hash=$Matches[1].ToLowerInvariant(); $name=$Matches[2]
     $asset=$release.assets | Where-Object name -eq $name | Select-Object -First 1
     if (!$asset -or $asset.state -ne 'uploaded') { throw "缺少公开下载：$name" }

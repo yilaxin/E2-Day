@@ -37,6 +37,8 @@ try {
     Copy-Item -LiteralPath (Join-Path $projectRoot 'THIRD_PARTY_NOTICES.md') -Destination $publishDirectory -Force
     Copy-Item -LiteralPath (Join-Path $projectRoot 'LICENSE') -Destination $publishDirectory -Force
     if ($Edition -eq 'Tutor') {
+        Copy-Item -LiteralPath (Join-Path $projectRoot 'docs/E2-Day-Tutor-Guide.pdf') -Destination (Join-Path $publishDirectory '安装与使用教程.pdf') -Force
+        Copy-Item -LiteralPath (Join-Path $projectRoot 'docs/TUTOR-START-HERE.txt') -Destination (Join-Path $publishDirectory '先读我.txt') -Force
         $imagesDirectory = Join-Path $publishDirectory 'images'; New-Item -ItemType Directory -Path $imagesDirectory -Force | Out-Null
         foreach ($imageName in @('tutor-today.png','tutor-calendar.png','tutor-student.png','tutor-income.png','tutor-editor.png','tutor-calendar-action.png')) {
             $imagePath = Join-Path $projectRoot "docs/images/$imageName"

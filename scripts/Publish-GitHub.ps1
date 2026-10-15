@@ -25,7 +25,7 @@ if (!$releaseDirectory.StartsWith($projectDirectory.TrimEnd('\') + '\', [StringC
 $releaseNotesPath = Join-Path $projectDirectory "docs/RELEASE-$versionTag.md"
 $assetNames = @("E2-Day-$versionTag-win-arm64.zip", "E2-Day-$versionTag-win-x64.zip", 'SHA256SUMS.txt')
 if ($IncludeHarmony) { $assetNames = @("E2-Day-$versionTag-win-arm64.zip", "E2-Day-$versionTag-win-x64.zip", "E2-Day-$versionTag-harmony-unsigned.zip", 'SHA256SUMS.txt') }
-if ($Edition -eq 'Tutor') { $assetNames = @("E2-Day-Tutor-v$Version-win-arm64.zip", "E2-Day-Tutor-v$Version-win-x64.zip", 'SHA256SUMS.txt') }
+if ($Edition -eq 'Tutor') { $assetNames = @("E2-Day-Tutor-v$Version-win-arm64.zip", "E2-Day-Tutor-v$Version-win-x64.zip", "E2-Day-Tutor-Guide-v$Version.pdf", 'SHA256SUMS.txt') }
 $responseDirectory = Join-Path $projectDirectory '.build/github'
 New-Item -ItemType Directory -Path $responseDirectory -Force | Out-Null
 
@@ -105,7 +105,7 @@ try {
         foreach ($checksumLine in Get-Content -LiteralPath (Join-Path $releaseDirectory 'SHA256SUMS.txt') -Encoding UTF8) {
             if ($checksumLine -match '^([a-fA-F0-9]{64})  (.+)$') { $expectedChecksums[$Matches[2]] = $Matches[1].ToLowerInvariant() }
         }
-        foreach ($packageName in $assetNames | Where-Object { $_.EndsWith('.zip') }) {
+        foreach ($packageName in $assetNames | Where-Object { $_.EndsWith('.zip') -or $_.EndsWith('.pdf') }) {
             $actualHash = (Get-FileHash -LiteralPath (Join-Path $releaseDirectory $packageName) -Algorithm SHA256).Hash.ToLowerInvariant()
             if ($expectedChecksums[$packageName] -ne $actualHash) { throw "本地程序包校验失败：$packageName" }
         }
@@ -210,7 +210,7 @@ try {
                 Write-Output "正在上传附件：$assetName，$($assetFile.Length) 字节。"
                 try {
                     $uploadUrl = $release.upload_url.Split('{')[0] + '?name=' + [Uri]::EscapeDataString($assetName)
-                    $assetContentType = if ($assetName.EndsWith('.zip')) { 'application/zip' } else { 'text/plain' }
+                    $assetContentType = if ($assetName.EndsWith('.zip')) { 'application/zip' } elseif ($assetName.EndsWith('.pdf')) { 'application/pdf' } else { 'text/plain' }
                     $uploadedAsset = Send-ReleaseAsset -UploadUrl $uploadUrl -FilePath $assetFile.FullName -ContentType $assetContentType
                 } catch {
                     if ($uploadAttempt -eq 3) { throw }
