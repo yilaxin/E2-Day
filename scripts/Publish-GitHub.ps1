@@ -2,7 +2,8 @@ param(
     [ValidateSet('Publish','Verify','Preview','Pages')][string]$Mode = 'Publish',
     [string]$Version = '',
     [string]$CommitMessage = '',
-    [string]$ReleaseDirectory = ''
+    [string]$ReleaseDirectory = '',
+    [switch]$IncludeHarmony
 )
 $ErrorActionPreference = 'Stop'
 $projectDirectory = Split-Path -Parent $PSScriptRoot
@@ -20,6 +21,7 @@ $releaseDirectory = if ($ReleaseDirectory) { [IO.Path]::GetFullPath((Join-Path $
 if (!$releaseDirectory.StartsWith($projectDirectory.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) { throw '发布目录必须位于项目内。' }
 $releaseNotesPath = Join-Path $projectDirectory "docs/RELEASE-$versionTag.md"
 $assetNames = @("E2-Day-$versionTag-win-arm64.zip", "E2-Day-$versionTag-win-x64.zip", 'SHA256SUMS.txt')
+if ($IncludeHarmony) { $assetNames = @("E2-Day-$versionTag-win-arm64.zip", "E2-Day-$versionTag-win-x64.zip", "E2-Day-$versionTag-harmony-unsigned.zip", 'SHA256SUMS.txt') }
 $responseDirectory = Join-Path $projectDirectory '.build/github'
 New-Item -ItemType Directory -Path $responseDirectory -Force | Out-Null
 
@@ -129,7 +131,7 @@ try {
             git add -- .gitignore CHANGELOG.md Directory.Build.props LICENSE NuGet.Config README.md THIRD_PARTY_NOTICES.md data docs scripts src tests 使用说明.md 需求说明.md 验证记录.md
             if ($LASTEXITCODE -ne 0) { throw '源码准备失败。' }
             $stagedFiles = @(git -c core.quotepath=false diff --cached --name-only)
-            if ($stagedFiles | Where-Object { $_ -match '(^|/)(\.build|artifacts|\.env|bin|obj|Accounts|LocalSync)(/|$)|\.(db|db-shm|db-wal|pfx|p12|key|zip|log|protected)$|(^|/)(accounts\.json|session\.lock)$' }) { throw '暂存内容含非发布文件，停止上传。' }
+            if ($stagedFiles | Where-Object { $_ -match '(^|/)(\.build|artifacts|\.env|bin|obj|Accounts|LocalSync|oh_modules|\.hvigor)(/|$)|\.(db|db-shm|db-wal|pfx|p12|key|zip|log|protected|p7b|p7s|cer|csr|jks|keystore|hap|har)$|(^|/)(accounts\.json|session\.lock|local\.properties|signing\.local\.json5)$' }) { throw '暂存内容含非发布文件，停止上传。' }
             if ($stagedFiles.Count -gt 0) {
                 git commit -m $CommitMessage
                 if ($LASTEXITCODE -ne 0) { throw '源码提交失败。' }

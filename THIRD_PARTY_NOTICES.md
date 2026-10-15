@@ -31,3 +31,7 @@
 ## 手机资源
 
 手机页面为项目自带静态资源，不使用远程 CDN。农历重复日期表由 .NET ChineseLunisolarCalendar 生成，图标沿用本项目 logo。独立手机版本使用浏览器的 IndexedDB、Web Crypto 与 Service Worker；应用不再包含 ASP.NET Core / Kestrel 局域网连接服务。
+
+## 鸿蒙原生工程
+
+工程骨架通过华为官方 `@deveco/deveco-cli` 1.3.5 模板生成；保留模板代码内 Huawei Device Co., Ltd. 的 Apache-2.0 声明。Apache-2.0 许可正文见 `src/DailyRecord.Harmony/LICENSE-TEMPLATE.txt`。开发工具本身及其依赖不打包为应用源码或程序附件。原生界面、任务与文件交换代码沿用本项目许可；图标和农历表沿用项目已有资源。

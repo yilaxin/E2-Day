@@ -18,3 +18,16 @@ TestResults/
 **/Accounts/
 **/LocalSync/
 **/accounts.json
+**/oh_modules/
+**/.hvigor/
+src/DailyRecord.Harmony/**/build/
+src/DailyRecord.Harmony/local.properties
+src/DailyRecord.Harmony/signing.local.json5
+*.p7b
+*.p7s
+*.csr
+*.jks
+*.keystore
+*.cer
+*.hap
+*.har

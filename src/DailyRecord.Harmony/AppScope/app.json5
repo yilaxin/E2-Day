@@ -1,0 +1,10 @@
+{
+  "app": {
+    "bundleName": "com.yilaxin.e2day",
+    "vendor": "yilaxin",
+    "versionCode": 10001,
+    "versionName": "0.1.1",
+    "icon": "$media:app_icon",
+    "label": "$string:app_name"
+  }
+}

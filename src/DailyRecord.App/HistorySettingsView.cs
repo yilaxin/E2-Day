@@ -118,7 +118,8 @@ public partial class MainWindow
         { var label = Ui.Text($"{source.Name}  ·  {source.Language}", 11, Ui.Muted); label.Margin = new Thickness(0, 7, 0, 0); news.Children.Add(label); }
         var refresh = Ui.Button("刷新资讯", () => _ = RefreshNewsAsync(true)); refresh.HorizontalAlignment = HorizontalAlignment.Left;
         refresh.Margin = new Thickness(0, 13, 0, 0); news.Children.Add(refresh); PageBody.Children.Add(Ui.Card(news));
-        PageBody.Children.Add(Ui.Text("E²-Day 2.0.0 · Explore Everyday Day · 探索每一天", 11, Ui.Muted));
+        var appVersion = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "2.1.0";
+        PageBody.Children.Add(Ui.Text($"E²-Day {appVersion} · Explore Everyday Day · 探索每一天", 11, Ui.Muted));
     }
 
     private void ExportBackup()

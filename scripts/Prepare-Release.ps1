@@ -1,4 +1,4 @@
-param([string]$Version = '', [string]$ReleaseDirectory = '')
+param([string]$Version = '', [string]$ReleaseDirectory = '', [string]$HarmonyPackageDirectory = '')
 $ErrorActionPreference = 'Stop'
 $projectDirectory = Split-Path -Parent $PSScriptRoot
 $appProject = [xml](Get-Content -LiteralPath (Join-Path $projectDirectory 'src/DailyRecord.App/DailyRecord.App.csproj') -Raw -Encoding UTF8)
@@ -16,6 +16,11 @@ foreach ($runtimeId in @('win-arm64','win-x64')) {
     if ((Get-Item -LiteralPath $executablePath).VersionInfo.FileVersion -ne "$Version.0") { throw "$runtimeId 程序版本与发布版本不一致。" }
     foreach ($documentName in @('使用说明.md','THIRD_PARTY_NOTICES.md','LICENSE')) {
         Copy-Item -LiteralPath (Join-Path $projectDirectory $documentName) -Destination $programDirectory -Force
+    }
+    $nativeGuide = Join-Path $projectDirectory 'docs/HARMONY-NATIVE.md'
+    if (Test-Path -LiteralPath $nativeGuide) {
+        New-Item -ItemType Directory -Path (Join-Path $programDirectory 'docs') -Force | Out-Null
+        Copy-Item -LiteralPath $nativeGuide -Destination (Join-Path $programDirectory 'docs/HARMONY-NATIVE.md') -Force
     }
     $packageName = "E2-Day-v$Version-$runtimeId.zip"
     $packagePath = Join-Path $releaseDirectory $packageName
@@ -44,6 +49,28 @@ foreach ($runtimeId in @('win-arm64','win-x64')) {
     $fileHash = (Get-FileHash -LiteralPath $packagePath -Algorithm SHA256).Hash.ToLowerInvariant()
     $checksumLines += "$fileHash  $packageName"
     Write-Output "准备完成：$packageName；版本、架构和包内文件检查通过。"
+}
+if ($HarmonyPackageDirectory) {
+    $nativeDirectory = [IO.Path]::GetFullPath((Join-Path $projectDirectory $HarmonyPackageDirectory))
+    if (!$nativeDirectory.StartsWith($projectDirectory.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) { throw '鸿蒙产物目录必须位于项目内。' }
+    & (Join-Path $projectDirectory 'tests/harmony-package-check.ps1') -PackageDirectory $nativeDirectory
+    $nativeHap = Join-Path $nativeDirectory 'entry-default-unsigned.hap'
+    if (!(Test-Path -LiteralPath $nativeHap -PathType Leaf)) { throw '只能公开明确的未签名 HAP；个人签名包留在本地。' }
+    $nativeStage = Join-Path $releaseDirectory ('harmony-unsigned-' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $nativeStage | Out-Null
+    Copy-Item -LiteralPath $nativeHap -Destination $nativeStage
+    Copy-Item -LiteralPath (Join-Path $nativeDirectory 'SHA256SUMS.txt') -Destination $nativeStage
+    Copy-Item -LiteralPath (Join-Path $projectDirectory 'docs/HARMONY-NATIVE.md') -Destination $nativeStage
+    Copy-Item -LiteralPath (Join-Path $projectDirectory 'LICENSE') -Destination $nativeStage
+    Copy-Item -LiteralPath (Join-Path $projectDirectory 'THIRD_PARTY_NOTICES.md') -Destination $nativeStage
+    Copy-Item -LiteralPath (Join-Path $projectDirectory 'src/DailyRecord.Harmony/LICENSE-TEMPLATE.txt') -Destination $nativeStage
+    [IO.File]::WriteAllText((Join-Path $nativeStage 'README.txt'), "E²-Day 鸿蒙原生未签名构建`n此 HAP 不能直接点击安装。请使用自己的华为开发者账号与设备签名。`n源码与签名说明：https://github.com/yilaxin/E2-Day/tree/v$Version/src/DailyRecord.Harmony`n详见 HARMONY-NATIVE.md。个人设备签名包、证书、profile 和密钥不公开。`n", [Text.UTF8Encoding]::new($false))
+    $nativeName = "E2-Day-v$Version-harmony-unsigned.zip"
+    $nativeZip = Join-Path $releaseDirectory $nativeName
+    if (Test-Path -LiteralPath $nativeZip) { throw '已有鸿蒙 ZIP，保留原文件。请使用新的准备目录。' }
+    [IO.Compression.ZipFile]::CreateFromDirectory($nativeStage, $nativeZip, [IO.Compression.CompressionLevel]::Optimal, $false)
+    $checksumLines += ((Get-FileHash -LiteralPath $nativeZip -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $nativeName)
+    Write-Output "准备完成：$nativeName；只含未签名 HAP、校验与公开说明。"
 }
 [System.IO.File]::WriteAllText((Join-Path $releaseDirectory 'SHA256SUMS.txt'), ($checksumLines -join "`n") + "`n", [System.Text.UTF8Encoding]::new($false))
 Write-Output "校验文件：$(Join-Path $releaseDirectory 'SHA256SUMS.txt')"

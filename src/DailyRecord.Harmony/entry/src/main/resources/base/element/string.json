@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "独立离线任务与文件交换"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "E²-Day 鸿蒙原生应用"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "E²-Day"
+    }
+  ]
+}

@@ -12,23 +12,27 @@ E²-Day 是一款中文个人任务与日历工具，适合记录工作计划、
 
 Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese lunar dates and holidays, local history, backups and task sharing images. Chinese interface; personal records stay on your computer.
 
+**新增鸿蒙原生版 0.1.1**：独立 ArkTS / ArkUI 应用，手机本机账号、离线任务与备注图片，手动与电脑交换 JSON。已在 Pura 70 / HarmonyOS 6.1 验证。公开构建为未签名 HAP，需用自己的开发者账号和设备签名；个人设备签名包不公开。[构建、签名及日常使用](docs/HARMONY-NATIVE.md)。既有网页手机入口继续使用。
+
 ![今日清单](docs/images/today.png)
 
 > 所有截图均由隔离的示例数据生成。首次运行时，个人任务清单为空；截图里的示例任务和资讯不会写入你的记录。
 
 ## 下载与开始使用
 
-公开稳定版：**2.0.0**，包含独立手机应用、本机账号和手动文件交换。下方提供对应 Windows 程序包。程序采用免安装、自包含的文件夹发布方式，下载包内已包含所需的 .NET 运行依赖。
+公开版本：**2.1.0**，新增鸿蒙原生工程与原生版 0.1.1 未签名构建，保留本机账号和手动文件交换。下方提供对应 Windows 程序包。程序采用免安装、自包含的文件夹发布方式，下载包内已包含所需的 .NET 运行依赖。
 
 | 你的电脑 | 下载文件 |
 | --- | --- |
-| Intel / AMD 处理器的 64 位 Windows 电脑 | [E2-Day-v2.0.0-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.0.0/E2-Day-v2.0.0-win-x64.zip) |
-| Snapdragon 等 ARM 处理器的 Windows ARM64 电脑 | [E2-Day-v2.0.0-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.0.0/E2-Day-v2.0.0-win-arm64.zip) |
+| Intel / AMD 处理器的 64 位 Windows 电脑 | [E2-Day-v2.1.0-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.0/E2-Day-v2.1.0-win-x64.zip) |
+| Snapdragon 等 ARM 处理器的 Windows ARM64 电脑 | [E2-Day-v2.1.0-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.0/E2-Day-v2.1.0-win-arm64.zip) |
 
 1. 在 Windows“设置 → 系统 → 关于 → 系统类型”中确认电脑架构，选择对应下载包。
 2. **完整解压**到一个固定文件夹，保留程序旁边的 DLL、图标和 `Data` 文件夹。
 3. 双击 `DailyRecord.exe`，打开后显示的 App 名称是 **E²-Day**。
 4. 在“今日清单”输入一件事，按 Enter 添加；需要未来日期或重复安排时，点击“安排事件”。
+
+鸿蒙原生未签名构建：[E2-Day-v2.1.0-harmony-unsigned.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.0/E2-Day-v2.1.0-harmony-unsigned.zip)。这不是直接安装包，签名步骤见原生说明。
 
 电脑端为 Windows 程序，没有 macOS、Linux 或 32 位 Windows 发布包。手机安装入口：[打开手机应用](https://yilaxin.github.io/E2-Day/mobile/)。首次联网准备完成后可添加到手机桌面，之后离线记录；华为 Pura 70 已验证桌面打开、断网保存与含图文件往返；其他手机浏览器尚未逐一真机验证，状态见[手机验收清单](docs/MOBILE-CHECKLIST.md)。Windows 发布包未做数字签名，Releases 提供 SHA256SUMS.txt 校验文件。
 
@@ -42,13 +46,13 @@ Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese
 
 ![独立手机任务示例](docs/images/mobile-independent-today.png)
 
-- 手机通过固定 HTTPS 页面安装，不需要电脑开机、同一 Wi-Fi、配对码或本地连接证书。
+- 鸿蒙原生版由本人的开发者签名安装，之后独立离线运行；网页手机版通过固定 HTTPS 页面安装。两种方式均不依赖电脑开机、同一 Wi-Fi、配对码或本地连接证书。
 - 电脑“偏好设置 → 手机与文件交换”、手机“账号 → 文件交换”可导出和导入交换文件，包含任务、事件、历史与被引用的图片。
 - 导入先预览：保留双方独有记录，相同记录去重，同一条记录不同则选择“保留本机”或“采用文件”。采用整条记录的版本；文件中缺少某条任务不会删除本机任务。
 - 确认合并前保留本机副本；文件损坏、缺图片、空间不足或预览后本机记录变化会拒绝导入，保留原记录。
-- 记录只保存在各自设备，没有自动同步或云端账号。请保留手机站点数据，并定期把交换文件另存为备份。
+- 记录只保存在各自设备，没有自动同步或云端账号。原生版请保留应用数据，网页手机版请保留站点数据；定期把交换文件另存为备份。
 
-安装和文件交换步骤见[使用说明](使用说明.md)。华为真机已完成安装、离线重开与两端文件往返。iPhone 尚未真机验证。
+安装和文件交换步骤见[使用说明](使用说明.md)。华为真机已分别完成原生版及网页手机版的离线重开与含图文件往返；原生 0.1.1 的完成／撤销、点击流畅度和桌面名称也由用户复查通过。iPhone 尚未真机验证。
 
 ## 功能一览
 
