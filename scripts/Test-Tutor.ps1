@@ -1,12 +1,14 @@
 param([switch]$Published,[ValidateSet('win-arm64','win-x64')][string]$RuntimeIdentifier='win-arm64',[string]$ReleaseDirectory='')
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Environment.ps1')
+$tutorProject = [xml](Get-Content -LiteralPath (Join-Path $projectRoot 'src/DailyRecord.Tutor/DailyRecord.Tutor.csproj') -Raw)
+$tutorVersion = [string]$tutorProject.Project.PropertyGroup.Version
 Push-Location $projectRoot
 try {
     dotnet run --project tests/DailyRecord.Tutor.Tests -p:UseSharedCompilation=false -- (Join-Path $projectRoot '.build/tutor-tests')
     if ($LASTEXITCODE -ne 0) { throw '家教版核心测试失败。' }
     if ($Published) {
-        $releaseRoot = if ($ReleaseDirectory) { [IO.Path]::GetFullPath((Join-Path $projectRoot $ReleaseDirectory)) } else { Join-Path $projectRoot 'artifacts/releases/tutor-v1.0.0' }
+        $releaseRoot = if ($ReleaseDirectory) { [IO.Path]::GetFullPath((Join-Path $projectRoot $ReleaseDirectory)) } else { Join-Path $projectRoot "artifacts/releases/tutor-v$tutorVersion" }
         if (!$releaseRoot.StartsWith($projectRoot.TrimEnd('\') + '\',[StringComparison]::OrdinalIgnoreCase)) { throw '验证目录必须位于项目内。' }
         $executable = Join-Path $releaseRoot "programs/E2-Day-Tutor-$RuntimeIdentifier/E2Day.Tutor.exe"
     } else {

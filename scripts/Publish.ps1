@@ -38,7 +38,7 @@ try {
     Copy-Item -LiteralPath (Join-Path $projectRoot 'LICENSE') -Destination $publishDirectory -Force
     if ($Edition -eq 'Tutor') {
         $imagesDirectory = Join-Path $publishDirectory 'images'; New-Item -ItemType Directory -Path $imagesDirectory -Force | Out-Null
-        foreach ($imageName in @('tutor-today.png','tutor-calendar.png','tutor-student.png','tutor-income.png','tutor-editor.png')) {
+        foreach ($imageName in @('tutor-today.png','tutor-calendar.png','tutor-student.png','tutor-income.png','tutor-editor.png','tutor-calendar-action.png')) {
             $imagePath = Join-Path $projectRoot "docs/images/$imageName"
             if (Test-Path -LiteralPath $imagePath) { Copy-Item -LiteralPath $imagePath -Destination $imagesDirectory -Force }
         }

@@ -73,6 +73,9 @@ internal static class TutorSmoke
         window.Navigate(0); Prepare(window); Click(window, "copy:" + taught.Id); Check(copied.Contains("等量关系") && !copied.Contains("内部教学笔记"), "反馈复制泄露内部备注或丢失内容"); Snapshot(window, Path.Combine(output, "tutor-today.png"));
         window.WriteClipboard = _ => throw new UnauthorizedAccessException("测试剪贴板拒绝访问"); Click(window, "copy:" + taught.Id); Check(Descendants(window).OfType<TextBlock>().Any(t => t.Text.Contains("暂时无法访问剪贴板")), "剪贴板失败没有反馈"); window.WriteClipboard = text => copied = text;
         window.SelectDate(window.Today); Check(Descendants(window).OfType<Button>().Any(b => Equals(b.Tag, "day:2026-10-15")), "月历控件缺失"); Snapshot(window, Path.Combine(output, "tutor-calendar.png"));
+        window.SelectDate(window.Today.AddDays(14)); Prepare(window);
+        Descendants(window).OfType<ScrollViewer>().First().ScrollToEnd();
+        Snapshot(window, Path.Combine(output, "tutor-calendar-action.png"));
         window.SelectStudent(first.Id); Snapshot(window, Path.Combine(output, "tutor-student.png"));
         window.Navigate(3); Snapshot(window, Path.Combine(output, "tutor-income.png"));
         window.Navigate(4); Snapshot(window, Path.Combine(output, "tutor-records.png")); window.Navigate(5); Snapshot(window, Path.Combine(output, "tutor-settings.png"));
@@ -84,7 +87,7 @@ internal static class TutorSmoke
         var preview = NoteImages.CreatePreview(null, store.Images(taught.ImageIds).Single()); Prepare(preview); Check(preview.Content is not null, "图片预览失败");
         var before = service.State.Lessons.Count; var backup = Path.Combine(store.DirectoryPath, "ui-roundtrip.json"); store.Export(backup, service.State); service.Restore(backup); Check(service.State.Lessons.Count == before && store.Images(taught.ImageIds).Count == 1, "界面图文备份往返失败");
         window.Width = 1000; window.Height = 650; window.Navigate(0); Snapshot(window, Path.Combine(output, "tutor-compact.png")); Check(window.ActualWidth >= 0, "小窗口布局失败");
-        var result = $"PASS Tutor WPF: {_checks} checks\nVersion: {Assembly.GetExecutingAssembly().GetName().Version}\nArchitecture: {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}\nIsolatedData: {store.DirectoryPath}\nStudents: {service.State.Students.Count}\nLessons: {service.State.Lessons.Count}\nScreenshots: 8\n"; File.WriteAllText(Path.Combine(output, "result.txt"), result);
+        var result = $"PASS Tutor WPF: {_checks} checks\nVersion: {Assembly.GetExecutingAssembly().GetName().Version}\nArchitecture: {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}\nIsolatedData: {store.DirectoryPath}\nStudents: {service.State.Students.Count}\nLessons: {service.State.Lessons.Count}\nScreenshots: 9\n"; File.WriteAllText(Path.Combine(output, "result.txt"), result);
         await Task.CompletedTask;
     }
 }

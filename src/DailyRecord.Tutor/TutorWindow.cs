@@ -173,7 +173,16 @@ public sealed class TutorWindow : Window
             var button = Ui.Button("", () => { _selectedDate = day; Render(); }); button.Content = panel; button.Height = 128; button.HorizontalContentAlignment = HorizontalAlignment.Stretch; button.VerticalContentAlignment = VerticalAlignment.Top; button.Padding = new Thickness(8); button.Margin = new Thickness(0, 0, 5, 5); button.Background = _selectedDate == day ? Ui.Selected : Ui.Surface; button.Tag = "day:" + day.ToString("yyyy-MM-dd"); grid.Children.Add(button);
         }
         _body.Children.Add(grid);
-        var selected = _selectedDate ?? Today; _body.Children.Add(Ui.Label($"{selected:yyyy 年 M 月 d 日} · 课程详情")); _body.Children.Add(Ui.Button("＋ 在这一天添加课程", () => AddLesson(selected)));
+        var selected = _selectedDate ?? Today; _body.Children.Add(Ui.Label($"{selected:yyyy 年 M 月 d 日} · 课程详情"));
+        var addSelectedDate = Ui.Button("＋  在这一天添加课程", () => AddLesson(selected), accent: true);
+        addSelectedDate.FontSize = 16;
+        addSelectedDate.FontWeight = FontWeights.SemiBold;
+        addSelectedDate.MinHeight = 52;
+        addSelectedDate.Padding = new Thickness(20, 14, 20, 14);
+        addSelectedDate.Margin = new Thickness(0, 4, 6, 14);
+        addSelectedDate.Tag = "add-selected-date-lesson";
+        addSelectedDate.ToolTip = $"添加 {selected:yyyy 年 M 月 d 日} 的课程";
+        _body.Children.Add(addSelectedDate);
         foreach (var l in _service.Lessons(selected, selected)) _body.Children.Add(LessonCard(l));
     }
     private void MoveCalendar(int direction)
@@ -240,7 +249,7 @@ public sealed class TutorWindow : Window
     private int _recordStatus;
     private void SettingsPage()
     {
-        Header("设置与备份", "E²-Day 家教版 1.0.0 · 记录保存在这台电脑上。");
+        Header("设置与备份", $"E²-Day 家教版 {typeof(TutorWindow).Assembly.GetName().Version!.ToString(3)} · 记录保存在这台电脑上。");
         _body.Children.Add(Ui.Card(Ui.Stack(Ui.Text("本机账号 · " + AccountName, 18, Ui.Accent, true), Ui.Text("每个账号拥有独立的学生与课程记录。", 13, Ui.Muted), Ui.Button("切换 / 管理账号登录", () => SwitchAccount?.Invoke()))));
         var panel = Ui.Stack(Ui.Text("保护你的教学记录", 20, Ui.Accent, true), Ui.Text("运行当天自动备份，保留最近 30 天；导出的家教版备份包含学生、课程、反馈、图片和待办。恢复会替换当前账号记录，恢复前会另存一份备份。", 13, Ui.Muted));
         panel.Children.Add(Ui.Row(Ui.Button("导出家教版备份", ExportBackup, true), Ui.Button("从备份恢复", RestoreBackup))); panel.Children.Add(Ui.Label("当前账号数据目录")); panel.Children.Add(Ui.Text(_store.DirectoryPath, 12, Ui.Muted));

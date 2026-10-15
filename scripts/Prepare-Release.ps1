@@ -26,7 +26,7 @@ foreach ($runtimeId in @('win-arm64','win-x64')) {
     Copy-Item -LiteralPath (Join-Path $projectDirectory $guide) -Destination (Join-Path $programDirectory '使用说明.md') -Force
     if ($Edition -eq 'Tutor') {
         $imagesDirectory = Join-Path $programDirectory 'images'; New-Item -ItemType Directory -Path $imagesDirectory -Force | Out-Null
-        foreach ($imageName in @('tutor-today.png','tutor-calendar.png','tutor-student.png','tutor-income.png','tutor-editor.png')) {
+        foreach ($imageName in @('tutor-today.png','tutor-calendar.png','tutor-student.png','tutor-income.png','tutor-editor.png','tutor-calendar-action.png')) {
             Copy-Item -LiteralPath (Join-Path $projectDirectory "docs/images/$imageName") -Destination $imagesDirectory -Force
         }
     }
@@ -44,7 +44,7 @@ foreach ($runtimeId in @('win-arm64','win-x64')) {
         $entryNames = @($archive.Entries | ForEach-Object FullName)
         $requiredFiles = @("$binaryName.exe","$binaryName.dll",'DailyRecord.Core.dll',"$binaryName.deps.json","$binaryName.runtimeconfig.json",'e_sqlite3.dll','hostfxr.dll','coreclr.dll','PresentationFramework.dll','使用说明.md','LICENSE','THIRD_PARTY_NOTICES.md','Data/Holidays/2026.json','Data/Holidays/LICENSE')
         if ($Edition -eq 'Standard') { $requiredFiles += @('Mobile/index.html','Mobile/app.js','Mobile/app.css','Mobile/sw.js','Mobile/manifest.webmanifest','Mobile/icon-192.png','Mobile/icon-512.png','Mobile/lunar-dates.json') }
-        else { $requiredFiles += @('e2-day-tutor.ico','images/tutor-calendar.png','images/tutor-editor.png','images/tutor-income.png','images/tutor-student.png','images/tutor-today.png'); if ($entryNames -contains 'DailyRecord.exe' -or $entryNames -contains 'Mobile/index.html') { throw '家教版包中混入日常版程序或手机入口。' } }
+        else { $requiredFiles += @('e2-day-tutor.ico','images/tutor-calendar.png','images/tutor-editor.png','images/tutor-income.png','images/tutor-student.png','images/tutor-today.png','images/tutor-calendar-action.png'); if ($entryNames -contains 'DailyRecord.exe' -or $entryNames -contains 'Mobile/index.html') { throw '家教版包中混入日常版程序或手机入口。' } }
         foreach ($required in $requiredFiles) {
             if ($required -notin $entryNames) { throw "$runtimeId 程序包缺少 $required。" }
         }

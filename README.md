@@ -4,12 +4,12 @@
 
 # E²-Day · 探索每一天
 
-**新增独立的 [E²-Day 家教版 1.0.0](https://github.com/yilaxin/E2-Day/releases/tag/tutor-v1.0.0)**：授课日历、学生档案、课后图文反馈、每周排课与课时收入统计。与日常版分别运行、分别保存数据。详见[家教版使用说明](docs/TUTOR-GUIDE.md)。
+**新增独立的 [E²-Day 家教版 1.0.1](https://github.com/yilaxin/E2-Day/releases/tag/tutor-v1.0.1)**：授课日历、学生档案、课后图文反馈、每周排课与课时收入统计。与日常版分别运行、分别保存数据。详见[家教版使用说明](docs/TUTOR-GUIDE.md)。
 
 | 家教版 Windows 下载 | 程序包 |
 | --- | --- |
-| Intel / AMD 64 位电脑 | [E2-Day-Tutor-v1.0.0-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/tutor-v1.0.0/E2-Day-Tutor-v1.0.0-win-x64.zip) |
-| ARM64 电脑 | [E2-Day-Tutor-v1.0.0-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/tutor-v1.0.0/E2-Day-Tutor-v1.0.0-win-arm64.zip) |
+| Intel / AMD 64 位电脑 | [E2-Day-Tutor-v1.0.1-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/tutor-v1.0.1/E2-Day-Tutor-v1.0.1-win-x64.zip) |
+| ARM64 电脑 | [E2-Day-Tutor-v1.0.1-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/tutor-v1.0.1/E2-Day-Tutor-v1.0.1-win-arm64.zip) |
 
 完整解压后运行 **E2Day.Tutor.exe**。以下原有说明与“下载最新版本”链接继续对应日常版。
 

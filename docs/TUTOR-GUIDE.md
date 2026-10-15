@@ -1,10 +1,10 @@
 # E²-Day 家教版使用说明
 
-当前版本 **1.0.0**。面向一对一家教老师，记录学生、课程、课后反馈与授课收入。仅支持 Windows 64 位电脑，提供 x64 和 ARM64 自包含免安装程序包。
+当前版本 **1.0.1**。面向一对一家教老师，记录学生、课程、课后反馈与授课收入。仅支持 Windows 64 位电脑，提供 x64 和 ARM64 自包含免安装程序包。
 
 ## 下载与打开
 
-发布页：[家教版 1.0.0](https://github.com/yilaxin/E2-Day/releases/tag/tutor-v1.0.0)。Intel / AMD 电脑下载 `win-x64.zip`，Snapdragon 等 ARM 电脑下载 `win-arm64.zip`。完整解压后双击 **E2Day.Tutor.exe**，保留旁边的依赖文件和 Data 文件夹；无需另装 .NET。
+发布页：[家教版 1.0.1](https://github.com/yilaxin/E2-Day/releases/tag/tutor-v1.0.1)。Intel / AMD 电脑下载 `win-x64.zip`，Snapdragon 等 ARM 电脑下载 `win-arm64.zip`。完整解压后双击 **E2Day.Tutor.exe**，保留旁边的依赖文件和 Data 文件夹；无需另装 .NET。
 
 家教版使用带“教”字的图标。可对 exe 右键创建桌面快捷方式，命名为“E²-Day 家教版”。日常版程序仍为 DailyRecord.exe，两者可同时打开。
 
@@ -51,6 +51,10 @@
 ## 4. 授课日历
 
 默认显示月历，日期格子显示课程开始时间与学生摘要，并汇总当天已授课时长与收入。点击日期查看课程详情并添加课程；“全年总览”可查看各月已授课汇总并进入该月。
+
+日期详情中的“在这一天添加课程”使用蓝底白字的大按钮，点击后直接为当前所选日期录课。
+
+![日期详情添加课程按钮](images/tutor-calendar-action.png)
 
 保留 Eday 的农历和已打包节假日信息；未知年度不猜测法定放假与调休。课程日期与统计支持 1901–2100 年。
 
@@ -110,4 +114,4 @@
 ./scripts/Publish-GitHub.ps1 -Edition Tutor
 ```
 
-程序包位于 `artifacts/releases/tutor-v1.0.0`，发布标签为 `tutor-v1.0.0`，普通版仍使用原来的版本与标签。家教版发布不会替换仓库“最新版”的日常版入口。
+程序包位于 `artifacts/releases/tutor-v1.0.1`，发布标签为 `tutor-v1.0.1`，普通版仍使用原来的版本与标签。家教版发布不会替换仓库“最新版”的日常版入口。
