@@ -1,4 +1,4 @@
-E²-Day 家教版 1.0.2：先看这里
+E²-Day 家教版 1.0.3：先看这里
 
 1. 请完整解压 ZIP，再打开 E2Day.Tutor.exe。
    exe 旁边的 DLL、Data 和 images 都是程序的一部分，请保留。
@@ -18,7 +18,7 @@ E²-Day 家教版 1.0.2：先看这里
 5. 创建本机账号并保存恢复码，然后添加第一位学生和第一节课程。
    不需要 GitHub 账号，不需要另装 .NET，也没有云端同步。
 
-下载来源：https://github.com/yilaxin/E2-Day/releases/tag/tutor-v1.0.2
+下载来源：https://github.com/yilaxin/E2-Day/releases/tag/tutor-v1.0.3
 问题反馈：https://github.com/yilaxin/E2-Day/issues
 
 请定期导出家教版备份。反馈问题时不要公开密码、恢复码、真实学生记录或个人备份。

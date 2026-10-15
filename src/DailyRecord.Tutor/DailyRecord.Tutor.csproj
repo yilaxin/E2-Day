@@ -5,11 +5,11 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>E2Day.Tutor</AssemblyName>
     <RootNamespace>DailyRecord.App</RootNamespace>
-    <Product>E²-Day 家教版</Product>
-    <AssemblyTitle>E²-Day 家教版</AssemblyTitle>
+    <Product>E²-Day Teacher</Product>
+    <AssemblyTitle>E²-Day Teacher</AssemblyTitle>
     <Description>记录每一堂课，看见每一步成长</Description>
     <ApplicationIcon>Assets/e2-day-tutor.ico</ApplicationIcon>
-    <Version>1.0.2</Version>
+    <Version>1.0.3</Version>
     <PublishTrimmed>false</PublishTrimmed>
   </PropertyGroup>
   <ItemGroup>
