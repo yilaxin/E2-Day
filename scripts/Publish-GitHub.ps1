@@ -3,25 +3,29 @@ param(
     [string]$Version = '',
     [string]$CommitMessage = '',
     [string]$ReleaseDirectory = '',
-    [switch]$IncludeHarmony
+    [switch]$IncludeHarmony,
+    [ValidateSet('Standard','Tutor')][string]$Edition = 'Standard'
 )
 $ErrorActionPreference = 'Stop'
 $projectDirectory = Split-Path -Parent $PSScriptRoot
 $ownerName = 'yilaxin'
 $repositoryName = 'E2-Day'
 $repoPath = "$ownerName/$repositoryName"
-$appProject = [xml](Get-Content -LiteralPath (Join-Path $projectDirectory 'src/DailyRecord.App/DailyRecord.App.csproj') -Raw -Encoding UTF8)
+$projectPath = if ($Edition -eq 'Tutor') { 'src/DailyRecord.Tutor/DailyRecord.Tutor.csproj' } else { 'src/DailyRecord.App/DailyRecord.App.csproj' }
+if ($Edition -eq 'Tutor' -and $IncludeHarmony) { throw '家教版当前仅发布 Windows。' }
+$appProject = [xml](Get-Content -LiteralPath (Join-Path $projectDirectory $projectPath) -Raw -Encoding UTF8)
 $appVersion = [string]$appProject.Project.PropertyGroup.Version
 if (-not $Version) { $Version = $appVersion }
 if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw '版本号需为 major.minor.patch 格式。' }
 if ($Mode -eq 'Publish' -and $Version -ne $appVersion) { throw '发布版本与 App 源码版本不一致。' }
 if (-not $CommitMessage) { $CommitMessage = "Publish E2-Day $Version with updated Windows packages and documentation" }
-$versionTag = "v$Version"
+$versionTag = if ($Edition -eq 'Tutor') { "tutor-v$Version" } else { "v$Version" }
 $releaseDirectory = if ($ReleaseDirectory) { [IO.Path]::GetFullPath((Join-Path $projectDirectory $ReleaseDirectory)) } else { Join-Path $projectDirectory "artifacts/releases/$versionTag" }
 if (!$releaseDirectory.StartsWith($projectDirectory.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) { throw '发布目录必须位于项目内。' }
 $releaseNotesPath = Join-Path $projectDirectory "docs/RELEASE-$versionTag.md"
 $assetNames = @("E2-Day-$versionTag-win-arm64.zip", "E2-Day-$versionTag-win-x64.zip", 'SHA256SUMS.txt')
 if ($IncludeHarmony) { $assetNames = @("E2-Day-$versionTag-win-arm64.zip", "E2-Day-$versionTag-win-x64.zip", "E2-Day-$versionTag-harmony-unsigned.zip", 'SHA256SUMS.txt') }
+if ($Edition -eq 'Tutor') { $assetNames = @("E2-Day-Tutor-v$Version-win-arm64.zip", "E2-Day-Tutor-v$Version-win-x64.zip", 'SHA256SUMS.txt') }
 $responseDirectory = Join-Path $projectDirectory '.build/github'
 New-Item -ItemType Directory -Path $responseDirectory -Force | Out-Null
 
@@ -220,7 +224,8 @@ try {
             }
             Write-Output "附件已验证：$assetName"
         }
-        $release = Invoke-GitHubApi -Method PATCH -Path "/repos/$repoPath/releases/$($release.id)" -Body @{ tag_name = $versionTag; target_commitish = $commitSha; draft = $false; prerelease = $false; make_latest = 'true' }
+        $makeLatest = if ($Edition -eq 'Tutor') { 'false' } else { 'true' }
+        $release = Invoke-GitHubApi -Method PATCH -Path "/repos/$repoPath/releases/$($release.id)" -Body @{ tag_name = $versionTag; target_commitish = $commitSha; draft = $false; prerelease = $false; make_latest = $makeLatest }
         if ($release.tag_name -ne $versionTag -or $release.draft) { throw '发布页版本标签或公开状态与目标不一致。' }
         Write-Output "发布成功：$($release.html_url)"
       }
@@ -241,7 +246,7 @@ try {
         Write-Output "最新静态构建：$($pageBuild.status)；提交：$($pageBuild.commit)；错误：$($pageBuild.error.message)"
     }
     $repository = Invoke-GitHubApi -Path "/repos/$repoPath"
-    $latestRelease = Invoke-GitHubApi -Path "/repos/$repoPath/releases/latest"
+    $latestRelease = if ($Edition -eq 'Tutor') { Invoke-GitHubApi -Path "/repos/$repoPath/releases/tags/$versionTag" } else { Invoke-GitHubApi -Path "/repos/$repoPath/releases/latest" }
     [pscustomobject]@{
         Repository = $repository.html_url; Public = -not $repository.private
         DefaultBranch = $repository.default_branch; Description = $repository.description

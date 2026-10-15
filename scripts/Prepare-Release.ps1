@@ -1,48 +1,64 @@
-param([string]$Version = '', [string]$ReleaseDirectory = '', [string]$HarmonyPackageDirectory = '')
+param([string]$Version = '', [string]$ReleaseDirectory = '', [string]$HarmonyPackageDirectory = '', [ValidateSet('Standard','Tutor')][string]$Edition = 'Standard')
 $ErrorActionPreference = 'Stop'
 $projectDirectory = Split-Path -Parent $PSScriptRoot
-$appProject = [xml](Get-Content -LiteralPath (Join-Path $projectDirectory 'src/DailyRecord.App/DailyRecord.App.csproj') -Raw -Encoding UTF8)
+$projectPath = if ($Edition -eq 'Tutor') { 'src/DailyRecord.Tutor/DailyRecord.Tutor.csproj' } else { 'src/DailyRecord.App/DailyRecord.App.csproj' }
+$productName = if ($Edition -eq 'Tutor') { 'E2-Day-Tutor' } else { 'E2-Day' }
+$binaryName = if ($Edition -eq 'Tutor') { 'E2Day.Tutor' } else { 'DailyRecord' }
+if ($Edition -eq 'Tutor' -and $HarmonyPackageDirectory) { throw '家教版当前仅发布 Windows。' }
+$appProject = [xml](Get-Content -LiteralPath (Join-Path $projectDirectory $projectPath) -Raw -Encoding UTF8)
 $appVersion = [string]$appProject.Project.PropertyGroup.Version
 if (-not $Version) { $Version = $appVersion }
 if ($Version -notmatch '^\d+\.\d+\.\d+$' -or $Version -ne $appVersion) { throw '发布版本与 App 项目版本不一致。' }
-$releaseDirectory = if ($ReleaseDirectory) { [IO.Path]::GetFullPath((Join-Path $projectDirectory $ReleaseDirectory)) } else { Join-Path $projectDirectory "artifacts/releases/v$Version" }
+$releaseTag = if ($Edition -eq 'Tutor') { "tutor-v$Version" } else { "v$Version" }
+$releaseDirectory = if ($ReleaseDirectory) { [IO.Path]::GetFullPath((Join-Path $projectDirectory $ReleaseDirectory)) } else { Join-Path $projectDirectory "artifacts/releases/$releaseTag" }
 if (!$releaseDirectory.StartsWith($projectDirectory.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) { throw '发布目录必须位于项目内。' }
 New-Item -ItemType Directory -Path $releaseDirectory -Force | Out-Null
 $checksumLines = @()
 foreach ($runtimeId in @('win-arm64','win-x64')) {
-    $programDirectory = Join-Path $releaseDirectory "programs/E2-Day-$runtimeId"
-    $executablePath = Join-Path $programDirectory 'DailyRecord.exe'
+    $programDirectory = Join-Path $releaseDirectory "programs/$productName-$runtimeId"
+    $executablePath = Join-Path $programDirectory "$binaryName.exe"
     if (-not (Test-Path -LiteralPath $executablePath)) { throw "尚未构建 $runtimeId 发布程序。" }
     if ((Get-Item -LiteralPath $executablePath).VersionInfo.FileVersion -ne "$Version.0") { throw "$runtimeId 程序版本与发布版本不一致。" }
-    foreach ($documentName in @('使用说明.md','THIRD_PARTY_NOTICES.md','LICENSE')) {
+    foreach ($documentName in @('THIRD_PARTY_NOTICES.md','LICENSE')) {
         Copy-Item -LiteralPath (Join-Path $projectDirectory $documentName) -Destination $programDirectory -Force
     }
+    $guide = if ($Edition -eq 'Tutor') { 'docs/TUTOR-GUIDE.md' } else { '使用说明.md' }
+    Copy-Item -LiteralPath (Join-Path $projectDirectory $guide) -Destination (Join-Path $programDirectory '使用说明.md') -Force
+    if ($Edition -eq 'Tutor') {
+        $imagesDirectory = Join-Path $programDirectory 'images'; New-Item -ItemType Directory -Path $imagesDirectory -Force | Out-Null
+        foreach ($imageName in @('tutor-today.png','tutor-calendar.png','tutor-student.png','tutor-income.png','tutor-editor.png')) {
+            Copy-Item -LiteralPath (Join-Path $projectDirectory "docs/images/$imageName") -Destination $imagesDirectory -Force
+        }
+    }
     $nativeGuide = Join-Path $projectDirectory 'docs/HARMONY-NATIVE.md'
-    if (Test-Path -LiteralPath $nativeGuide) {
+    if ($Edition -eq 'Standard' -and (Test-Path -LiteralPath $nativeGuide)) {
         New-Item -ItemType Directory -Path (Join-Path $programDirectory 'docs') -Force | Out-Null
         Copy-Item -LiteralPath $nativeGuide -Destination (Join-Path $programDirectory 'docs/HARMONY-NATIVE.md') -Force
     }
-    $packageName = "E2-Day-v$Version-$runtimeId.zip"
+    $packageName = "$productName-v$Version-$runtimeId.zip"
     $packagePath = Join-Path $releaseDirectory $packageName
     $pendingPath = Join-Path $releaseDirectory ("E2-Day-$runtimeId-" + [Guid]::NewGuid().ToString('N') + '.zip')
     [System.IO.Compression.ZipFile]::CreateFromDirectory($programDirectory, $pendingPath, [System.IO.Compression.CompressionLevel]::Optimal, $false)
     $archive = [System.IO.Compression.ZipFile]::OpenRead($pendingPath)
     try {
         $entryNames = @($archive.Entries | ForEach-Object FullName)
-        foreach ($required in @('DailyRecord.exe','DailyRecord.dll','DailyRecord.Core.dll','DailyRecord.deps.json','DailyRecord.runtimeconfig.json','e_sqlite3.dll','hostfxr.dll','coreclr.dll','PresentationFramework.dll','Mobile/index.html','Mobile/app.js','Mobile/app.css','Mobile/sw.js','Mobile/manifest.webmanifest','Mobile/icon-192.png','Mobile/icon-512.png','Mobile/lunar-dates.json','使用说明.md','LICENSE','THIRD_PARTY_NOTICES.md','Data/Holidays/2026.json','Data/Holidays/LICENSE')) {
+        $requiredFiles = @("$binaryName.exe","$binaryName.dll",'DailyRecord.Core.dll',"$binaryName.deps.json","$binaryName.runtimeconfig.json",'e_sqlite3.dll','hostfxr.dll','coreclr.dll','PresentationFramework.dll','使用说明.md','LICENSE','THIRD_PARTY_NOTICES.md','Data/Holidays/2026.json','Data/Holidays/LICENSE')
+        if ($Edition -eq 'Standard') { $requiredFiles += @('Mobile/index.html','Mobile/app.js','Mobile/app.css','Mobile/sw.js','Mobile/manifest.webmanifest','Mobile/icon-192.png','Mobile/icon-512.png','Mobile/lunar-dates.json') }
+        else { $requiredFiles += @('e2-day-tutor.ico','images/tutor-calendar.png','images/tutor-editor.png','images/tutor-income.png','images/tutor-student.png','images/tutor-today.png'); if ($entryNames -contains 'DailyRecord.exe' -or $entryNames -contains 'Mobile/index.html') { throw '家教版包中混入日常版程序或手机入口。' } }
+        foreach ($required in $requiredFiles) {
             if ($required -notin $entryNames) { throw "$runtimeId 程序包缺少 $required。" }
         }
         if ($entryNames -contains 'DailyRecord.Sync.dll' -or $entryNames -contains 'Mobile/install.html' -or $entryNames -contains 'Microsoft.AspNetCore.Server.Kestrel.Core.dll') { throw "$runtimeId 仍包含已停用的局域网同步程序。" }
         if ($entryNames | Where-Object { $_ -match '\.(db|log|pfx|p12|key|pdb|protected)$|backup|accounts\.json|session\.lock|(^|/)(\.build|previews|Accounts|LocalSync)(/|$)' }) { throw "$runtimeId 程序包包含非发布文件。" }
-        foreach ($binaryName in @('DailyRecord.exe','e_sqlite3.dll')) {
-            $binaryStream = $archive.GetEntry($binaryName).Open()
+        foreach ($checkedBinary in @("$binaryName.exe",'e_sqlite3.dll')) {
+            $binaryStream = $archive.GetEntry($checkedBinary).Open()
             $binaryMemory = [System.IO.MemoryStream]::new()
             try { $binaryStream.CopyTo($binaryMemory); $binaryBytes = $binaryMemory.ToArray() }
             finally { $binaryStream.Dispose(); $binaryMemory.Dispose() }
             $peOffset = [BitConverter]::ToInt32($binaryBytes,0x3c)
             $machine = [BitConverter]::ToUInt16($binaryBytes,$peOffset+4)
             $expectedMachine = if ($runtimeId -eq 'win-arm64') { 0xAA64 } else { 0x8664 }
-            if ($machine -ne $expectedMachine) { throw "$runtimeId 的 $binaryName 架构错误。" }
+            if ($machine -ne $expectedMachine) { throw "$runtimeId 的 $checkedBinary 架构错误。" }
         }
     } finally { $archive.Dispose() }
     Move-Item -LiteralPath $pendingPath -Destination $packagePath -Force

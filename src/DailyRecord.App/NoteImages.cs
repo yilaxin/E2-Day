@@ -116,13 +116,15 @@ internal sealed class NoteImageEditor : Border
     private readonly TextBlock _message = Ui.Text("", 10, Ui.Muted);
     private readonly Button _upload;
     private readonly Button _paste;
+    private readonly string _recordLabel;
     public IReadOnlyList<NoteImage> Images => _images.ToArray();
     internal Func<IReadOnlyList<string>> SelectFiles { get; set; }
     internal Func<BitmapSource?> ReadClipboardImage { get; set; } = Clipboard.GetImage;
     internal Task PendingImport { get; private set; } = Task.CompletedTask;
 
-    public NoteImageEditor(IEnumerable<NoteImage>? images = null)
+    public NoteImageEditor(IEnumerable<NoteImage>? images = null, string recordLabel = "任务")
     {
+        _recordLabel = recordLabel;
         _images = (images ?? []).ToList();
         SelectFiles = () =>
         {
@@ -148,7 +150,7 @@ internal sealed class NoteImageEditor : Border
         {
             if (paths.Count > NoteImage.MaxPerNote) throw new InvalidDataException("一次最多选择 8 张图片。");
             var imported = await Task.Run(() => paths.Select(NoteImages.ImportFile).ToList());
-            Append(imported); _message.Text = "图片已添加，保存任务后生效。";
+            Append(imported); _message.Text = $"图片已添加，保存{_recordLabel}后生效。";
         }
         catch (Exception ex) when (ex is InvalidDataException or IOException or FileFormatException or UnauthorizedAccessException or NotSupportedException or ArgumentException or COMException)
         { _message.Text = ex is InvalidDataException ? ex.Message : "无法读取图片，请选择有效的 PNG、JPG、BMP、GIF 或 TIFF 图片。"; }
@@ -161,7 +163,7 @@ internal sealed class NoteImageEditor : Border
         {
             var bitmap = ReadClipboardImage();
             if (bitmap is null) { _message.Text = "剪贴板中没有图片，请先复制图片。"; return; }
-            Append([NoteImages.Normalize(bitmap, "粘贴图片.png")]); _message.Text = "图片已添加，保存任务后生效。";
+            Append([NoteImages.Normalize(bitmap, "粘贴图片.png")]); _message.Text = $"图片已添加，保存{_recordLabel}后生效。";
         }
         catch (Exception ex) when (ex is InvalidDataException or IOException or FileFormatException or NotSupportedException or ArgumentException or ExternalException)
         { _message.Text = ex is InvalidDataException ? ex.Message : "暂时无法粘贴图片，请重试或使用上传图片。"; }
@@ -181,7 +183,7 @@ internal sealed class NoteImageEditor : Border
         {
             var thumbnail = NoteImages.Thumbnail(image, Window.GetWindow(this), 118, 80);
             var name = Ui.Text(image.FileName, 10, Ui.Muted); name.Width = 118; name.TextWrapping = TextWrapping.NoWrap; name.TextTrimming = TextTrimming.CharacterEllipsis;
-            var remove = Ui.Button("移除", () => { _images.Remove(image); Render(); _message.Text = "已从备注移除，保存任务后生效。"; }, quiet: true);
+            var remove = Ui.Button("移除", () => { _images.Remove(image); Render(); _message.Text = $"已从备注移除，保存{_recordLabel}后生效。"; }, quiet: true);
             remove.Tag = "remove-note-image:" + image.Id; remove.FontSize = 10; remove.Padding = new Thickness(4);
             var item = Ui.Stack(thumbnail, name, remove); item.Width = 125; item.Margin = new Thickness(0, 0, 5, 8); _gallery.Children.Add(item);
         }
