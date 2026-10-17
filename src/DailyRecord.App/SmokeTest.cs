@@ -11,7 +11,7 @@ namespace DailyRecord.App;
 
 internal static partial class SmokeTest
 {
-    public static async Task Run(MainWindow window, TaskService service, HolidayService holidays, PreviewClock clock, string outputDirectory)
+    public static async Task Run(MainWindow window, TaskService service, SqliteStore store, HolidayService holidays, PreviewClock clock, string outputDirectory)
     {
         Directory.CreateDirectory(outputDirectory);
         VerifyAccountFlow(outputDirectory);
@@ -65,17 +65,18 @@ internal static partial class SmokeTest
         await VerifyTaskShare(window, service, holidays, clock, outputDirectory);
         await VerifyNoteImages(window, service, holidays, outputDirectory);
         VerifyLongTermTasks(window, service, clock, outputDirectory);
+        VerifyAnalytics(window, service, store, holidays, clock, outputDirectory);
 
         foreach (var page in Enum.GetValues<PageKind>())
         {
             window.Navigate(page); Prepare(window);
-            Render((FrameworkElement)window.Content, 1400, 940, Path.Combine(outputDirectory, page.ToString().ToLowerInvariant() + ".png"));
+            Render((FrameworkElement)window.Content, 1400, 940, Path.Combine(outputDirectory, page == PageKind.Analytics ? "analytics-basic.png" : page.ToString().ToLowerInvariant() + ".png"));
         }
         var editor = new EditDialog(window, service.Today, true);
         var editorRoot = (FrameworkElement)editor.Content;
         Render(editorRoot, 560, 850, Path.Combine(outputDirectory, "event-editor.png"));
         File.WriteAllText(Path.Combine(outputDirectory, "result.txt"),
-            "PASS: account creation and login callbacks; legacy migration and backup; local account settings and file exchange entries; WPF root layout; 4 page renders; event editor render; mark/unmark important; complete/undo; viewed/undo; persisted state; calendar control reuse, task changes, completion, rescheduling, cancellation, backup restore, day rollover and leap-year switching; month zoom, task previews, completion fading, overflow, month/year navigation and return to overview; task share image, empty/long lists, filtering, native bitmap + PNG data, copy button and clipboard contention retries; note image upload callback, PNG/JPEG import, orientation, scaling, thumbnails, preview, draft isolation, removal, invalid files, size/count limits and history images.\nScreenshots use explicit preview data in an isolated data directory. Clipboard tests use a recording backend and leave the system clipboard untouched. Image picker tests inject file paths and do not open the system dialog.\nRuntime: " + System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory());
+            "PASS: account creation and login callbacks; legacy migration and backup; local account settings and file exchange entries; WPF root layout; 5 page renders; event editor render; mark/unmark important; complete/undo; viewed/undo; persisted state; calendar control reuse, task changes, completion, rescheduling, cancellation, backup restore, day rollover and leap-year switching; month zoom, task previews, completion fading, overflow, month/year navigation and return to overview; task share image, empty/long lists, filtering, native bitmap + PNG data, copy button and clipboard contention retries; note image upload callback, PNG/JPEG import, orientation, scaling, thumbnails, preview, draft isolation, removal, invalid files, size/count limits and history images.\nScreenshots use explicit preview data in an isolated data directory. Clipboard tests use a recording backend and leave the system clipboard untouched. Image picker tests inject file paths and do not open the system dialog.\nRuntime: " + System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory());
     }
 
     private static void VerifyAccountFlow(string outputDirectory)

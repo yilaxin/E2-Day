@@ -9,7 +9,7 @@
     <AssemblyTitle>E²-Day</AssemblyTitle>
     <Description>Explore Everyday Day · 探索每一天</Description>
     <ApplicationIcon>Assets/e2-day.ico</ApplicationIcon>
-    <Version>2.1.1</Version>
+    <Version>2.1.2</Version>
     <PublishTrimmed>false</PublishTrimmed>
   </PropertyGroup>
   <ItemGroup>

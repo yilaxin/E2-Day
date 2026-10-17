@@ -62,7 +62,7 @@ public partial class App : Application
             MainWindow = window;
             if (_smoke)
             {
-                await SmokeTest.Run(window, service, holidays, (PreviewClock)clock, smokeOutput!);
+                await SmokeTest.Run(window, service, _store, holidays, (PreviewClock)clock, smokeOutput!);
                 Shutdown(0);
             }
             else

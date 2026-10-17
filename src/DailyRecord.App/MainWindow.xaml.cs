@@ -10,7 +10,7 @@ using DailyRecord.Core;
 
 namespace DailyRecord.App;
 
-public enum PageKind { Today, Year, History, Settings }
+public enum PageKind { Today, Year, History, Settings, Analytics }
 
 public partial class MainWindow : Window
 {
@@ -47,7 +47,7 @@ public partial class MainWindow : Window
         }
         _wide = Width >= 1240;
         foreach (var pair in new[] { (PageKind.Today, "◷  今日清单"), (PageKind.Year, "▦  全年日历"),
-                     (PageKind.History, "≡  历史记录"), (PageKind.Settings, "⚙  偏好设置") })
+                     (PageKind.Analytics, "▥  数据概览"), (PageKind.History, "≡  历史记录"), (PageKind.Settings, "⚙  偏好设置") })
         {
             var destination = pair.Item1;
             var button = Ui.Button(pair.Item2, () => Navigate(destination));
@@ -112,6 +112,7 @@ public partial class MainWindow : Window
             case PageKind.Year: if (_selectedMonth is null) BuildYear(); else BuildMonth(); break;
             case PageKind.History: BuildHistory(); break;
             case PageKind.Settings: BuildSettings(); break;
+            case PageKind.Analytics: BuildAnalytics(); break;
         }
     }
     private void Header(string eyebrow, string title, string subtitle)

@@ -461,6 +461,7 @@ AccountAndSyncTests.Run(Test, runRoot);
 FileImportTests.Run(Test, runRoot);
 
 LongTermTaskTests.Run(Test, Check, () => NewFixture());
+AnalyticsTests.Run(Test, Check, () => NewFixture());
 
 if (args.Contains("--network"))
 {
