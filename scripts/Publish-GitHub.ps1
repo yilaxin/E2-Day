@@ -140,8 +140,6 @@ try {
                 git commit -m $CommitMessage
                 if ($LASTEXITCODE -ne 0) { throw '源码提交失败。' }
             }
-            git branch -M main
-            if ($LASTEXITCODE -ne 0) { throw '无法设置发布主分支。' }
             $configuredOrigin = git remote get-url origin 2>$null
             if ($configuredOrigin) {
                 if ($configuredOrigin -ne "https://github.com/$repoPath.git") { throw '已有远程仓库与目标不同，停止上传。' }
@@ -159,8 +157,8 @@ try {
             if ($tagCommit -ne $commitSha) { throw '版本标签与当前发布提交不一致，停止上传。' }
           }
             Write-Output '正在上传源码、说明和功能截图。'
-            if ($Mode -eq 'Publish') { git -c credential.username=$ownerName -c credential.interactive=never push -u origin main "refs/tags/$versionTag" }
-            else { git -c credential.username=$ownerName -c credential.interactive=never push -u origin main }
+            if ($Mode -eq 'Publish') { git -c credential.username=$ownerName -c credential.interactive=never push origin HEAD:refs/heads/main "refs/tags/$versionTag" }
+            else { git -c credential.username=$ownerName -c credential.interactive=never push origin HEAD:refs/heads/main }
             if ($LASTEXITCODE -ne 0) { throw '源码上传失败。' }
           if ($Mode -eq 'Publish') {
             git archive --format=zip --output (Join-Path $releaseDirectory "E2-Day-$versionTag-source.zip") HEAD

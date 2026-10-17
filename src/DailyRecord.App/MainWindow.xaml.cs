@@ -101,6 +101,7 @@ public partial class MainWindow : Window
         foreach (var pair in _nav)
         {
             pair.Value.Background = pair.Key == _page ? Ui.Selected : Brushes.Transparent;
+            pair.Value.BorderBrush = pair.Key == _page ? Brushes.White : Brushes.Transparent;
             pair.Value.Foreground = pair.Key == _page ? Ui.Accent : Ui.Muted;
             pair.Value.FontWeight = pair.Key == _page ? FontWeights.SemiBold : FontWeights.Normal;
         }

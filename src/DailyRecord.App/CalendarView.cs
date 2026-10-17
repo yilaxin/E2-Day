@@ -115,6 +115,7 @@ public partial class MainWindow
         var bottom = Ui.Text("", 7);
         bottom.TextWrapping = TextWrapping.NoWrap; bottom.TextTrimming = TextTrimming.CharacterEllipsis; Grid.SetRow(bottom, 1); content.Children.Add(bottom);
         var button = Ui.Button("", () => ShowDate(date)); button.Content = content;
+        button.BorderBrush = Brushes.Transparent;
         button.Padding = new Thickness(3, 1, 3, 1); button.Margin = new Thickness(1); button.Height = 25;
         _calendarDays[date] = new(date, button, number, mark, bottom);
         button.Tag = "date:" + date.ToString("yyyy-MM-dd"); return button;

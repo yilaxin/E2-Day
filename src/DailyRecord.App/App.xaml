@@ -3,24 +3,45 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              ShutdownMode="OnMainWindowClose">
   <Application.Resources>
-    <!-- Sky blue, ivory and sunrise gold follow the E²-Day logo. -->
-    <SolidColorBrush x:Key="InkBrush" Color="#20384D" />
-    <SolidColorBrush x:Key="MutedBrush" Color="#5C7184" />
-    <SolidColorBrush x:Key="AccentBrush" Color="#216FA6" />
-    <SolidColorBrush x:Key="LineBrush" Color="#DCE7F1" />
-    <SolidColorBrush x:Key="PageBrush" Color="#F4F8FD" />
-    <SolidColorBrush x:Key="SidebarBrush" Color="#EAF3FB" />
-    <SolidColorBrush x:Key="SidebarLineBrush" Color="#D3E2EF" />
-    <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFEFB" />
-    <SolidColorBrush x:Key="SubtleSurfaceBrush" Color="#F1F6FB" />
-    <SolidColorBrush x:Key="NeutralFillBrush" Color="#EDF3F9" />
-    <SolidColorBrush x:Key="SelectedBrush" Color="#DFEEFB" />
-    <SolidColorBrush x:Key="OnAccentMutedBrush" Color="#EAF5FF" />
-    <SolidColorBrush x:Key="BlankDayBrush" Color="#F4F7FB" />
-    <SolidColorBrush x:Key="ImportantTextBrush" Color="#966614" />
-    <SolidColorBrush x:Key="ImportantFillBrush" Color="#FFF7DF" />
-    <SolidColorBrush x:Key="ImportantBadgeBrush" Color="#FFF0C2" />
-    <SolidColorBrush x:Key="ImportantLineBrush" Color="#E5C36B" />
+    <!-- Opaque pastel foundation, translucent glass surfaces and readable violet ink. -->
+    <SolidColorBrush x:Key="InkBrush" Color="#342F4B" />
+    <SolidColorBrush x:Key="MutedBrush" Color="#6E6683" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#6352A6" />
+    <SolidColorBrush x:Key="LineBrush" Color="#DAD5E8" />
+    <LinearGradientBrush x:Key="PageBrush" StartPoint="0,0" EndPoint="1,1">
+      <GradientStop Color="#E8E6FC" Offset="0" />
+      <GradientStop Color="#F5E6F2" Offset="0.5" />
+      <GradientStop Color="#F4DDEB" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="ActionBrush" StartPoint="0,0" EndPoint="1,1">
+      <GradientStop Color="#3F72CD" Offset="0" />
+      <GradientStop Color="#8558B8" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="SidebarBrush" StartPoint="0,0" EndPoint="1,1">
+      <GradientStop Color="#BBFFFFFF" Offset="0" />
+      <GradientStop Color="#65FFFFFF" Offset="1" />
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="SidebarLineBrush" Color="#E6FFFFFF" />
+    <LinearGradientBrush x:Key="SurfaceBrush" StartPoint="0,0" EndPoint="1,1">
+      <GradientStop Color="#CFFFFFFF" Offset="0" />
+      <GradientStop Color="#91FFFFFF" Offset="1" />
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="SubtleSurfaceBrush" Color="#88FFFFFF" />
+    <SolidColorBrush x:Key="NeutralFillBrush" Color="#A6FFFFFF" />
+    <SolidColorBrush x:Key="SelectedBrush" Color="#DBE6DFFD" />
+    <SolidColorBrush x:Key="OnAccentMutedBrush" Color="#F2EDFF" />
+    <SolidColorBrush x:Key="BlankDayBrush" Color="#32FFFFFF" />
+    <SolidColorBrush x:Key="ImportantTextBrush" Color="#805617" />
+    <SolidColorBrush x:Key="ImportantFillBrush" Color="#E8FFF3D9" />
+    <SolidColorBrush x:Key="ImportantBadgeBrush" Color="#FFF0C9" />
+    <SolidColorBrush x:Key="ImportantLineBrush" Color="#D8B66D" />
+    <!-- Only the daily edition defines this style; the shared helper leaves Teacher unchanged. -->
+    <Style x:Key="GlassCard" TargetType="Border">
+      <Setter Property="BorderBrush" Value="#F0FFFFFF" />
+      <Setter Property="Effect">
+        <Setter.Value><DropShadowEffect Color="#6B528E" BlurRadius="16" ShadowDepth="3" Opacity="0.075" /></Setter.Value>
+      </Setter>
+    </Style>
     <Style TargetType="Window">
       <Setter Property="Icon" Value="pack://siteoforigin:,,,/e2-day.ico" />
       <Setter Property="FontFamily" Value="Microsoft YaHei UI, Segoe UI" />
@@ -41,7 +62,7 @@
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="TextBox">
-            <Border x:Name="Bd" CornerRadius="8" Background="{TemplateBinding Background}"
+            <Border x:Name="Bd" CornerRadius="11" Background="{TemplateBinding Background}"
                     BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
               <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" />
             </Border>
@@ -59,7 +80,7 @@
       <Setter Property="Padding" Value="12,8" />
       <Setter Property="Background" Value="{StaticResource NeutralFillBrush}" />
       <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
-      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="#BBFFFFFF" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="Cursor" Value="Hand" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -67,14 +88,14 @@
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">
-            <Border x:Name="Bd" CornerRadius="8" Background="{TemplateBinding Background}"
+            <Border x:Name="Bd" CornerRadius="11" Background="{TemplateBinding Background}"
                     BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
               <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                 VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
             </Border>
             <ControlTemplate.Triggers>
-              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Opacity" Value="0.8" /></Trigger>
-              <Trigger Property="IsPressed" Value="True"><Setter TargetName="Bd" Property="Opacity" Value="0.6" /></Trigger>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Opacity" Value="0.86" /><Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentBrush}" /></Trigger>
+              <Trigger Property="IsPressed" Value="True"><Setter TargetName="Bd" Property="Opacity" Value="0.7" /></Trigger>
               <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentBrush}" /></Trigger>
               <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45" /></Trigger>
             </ControlTemplate.Triggers>
@@ -83,13 +104,14 @@
       </Setter>
     </Style>
     <Style x:Key="AccentButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-      <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+      <Setter Property="Background" Value="{StaticResource ActionBrush}" />
       <Setter Property="Foreground" Value="White" />
     </Style>
     <Style x:Key="QuietButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Padding" Value="8,6" />
       <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+      <Setter Property="BorderBrush" Value="Transparent" />
     </Style>
     <Style TargetType="ComboBox">
       <Setter Property="Padding" Value="8,7" />
@@ -97,6 +119,69 @@
       <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
       <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
       <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ComboBox">
+            <Grid>
+              <ToggleButton Focusable="False" ClickMode="Press"
+                            IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                <ToggleButton.Template>
+                  <ControlTemplate TargetType="ToggleButton">
+                    <Border Background="Transparent" />
+                  </ControlTemplate>
+                </ToggleButton.Template>
+              </ToggleButton>
+              <Border x:Name="Bd" CornerRadius="11" IsHitTestVisible="False"
+                      Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                      BorderThickness="{TemplateBinding BorderThickness}">
+                <Grid>
+                  <ContentPresenter Margin="12,8,32,8" VerticalAlignment="Center"
+                                    Content="{TemplateBinding SelectionBoxItem}"
+                                    ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" />
+                  <Path Data="M 0 0 L 4 4 L 8 0" Stroke="{StaticResource MutedBrush}" StrokeThickness="1.4"
+                        HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,14,0" />
+                </Grid>
+              </Border>
+              <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True" Focusable="False"
+                     IsOpen="{TemplateBinding IsDropDownOpen}" PopupAnimation="None">
+                <Border Background="#FCF9FF" BorderBrush="{StaticResource LineBrush}" BorderThickness="1"
+                        CornerRadius="11" Padding="5" Margin="0,4,0,0" MinWidth="{TemplateBinding ActualWidth}"
+                        MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                  <ScrollViewer CanContentScroll="True">
+                    <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
+                  </ScrollViewer>
+                </Border>
+              </Popup>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentBrush}" /></Trigger>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentBrush}" /></Trigger>
+              <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style TargetType="ComboBoxItem">
+      <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ComboBoxItem">
+            <Border x:Name="Bd" Background="Transparent" CornerRadius="7" Padding="{TemplateBinding Padding}">
+              <ContentPresenter />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Bd" Property="Background" Value="{StaticResource SelectedBrush}" /></Trigger>
+              <Trigger Property="IsSelected" Value="True"><Setter TargetName="Bd" Property="Background" Value="{StaticResource SelectedBrush}" /></Trigger>
+              <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
     <Style TargetType="DatePicker">
       <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />

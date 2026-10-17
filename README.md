@@ -29,18 +29,20 @@ Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese
 
 **新增鸿蒙原生版 0.1.1**：独立 ArkTS / ArkUI 应用，手机本机账号、离线任务与备注图片，手动与电脑交换 JSON。已在 Pura 70 / HarmonyOS 6.1 验证。公开构建为未签名 HAP，需用自己的开发者账号和设备签名；个人设备签名包不公开。[构建、签名及日常使用](docs/HARMONY-NATIVE.md)。既有网页手机入口继续使用。
 
+**Windows 日常版 2.1.1 · 玻璃拟态界面**：粉紫柔光背景、半透明圆角卡片和蓝紫操作按钮，覆盖今日清单、全年／月历、历史、设置与编辑窗口。金色重要标记、完成淡化和原有记录继续保留。
+
 ![今日清单](docs/images/today.png)
 
 > 所有截图均由隔离的示例数据生成。首次运行时，个人任务清单为空；截图里的示例任务和资讯不会写入你的记录。
 
 ## 下载与开始使用
 
-公开版本：**2.1.0**，新增鸿蒙原生工程与原生版 0.1.1 未签名构建，保留本机账号和手动文件交换。下方提供对应 Windows 程序包。程序采用免安装、自包含的文件夹发布方式，下载包内已包含所需的 .NET 运行依赖。
+Windows 日常版：**2.1.1**，更新为玻璃拟态界面，保留任务、日历、图文备注、本机账号和手动文件交换。鸿蒙原生版仍为 0.1.1。下方提供对应 Windows 程序包。程序采用免安装、自包含的文件夹发布方式，下载包内已包含所需的 .NET 运行依赖。
 
 | 你的电脑 | 下载文件 |
 | --- | --- |
-| Intel / AMD 处理器的 64 位 Windows 电脑 | [E2-Day-v2.1.0-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.0/E2-Day-v2.1.0-win-x64.zip) |
-| Snapdragon 等 ARM 处理器的 Windows ARM64 电脑 | [E2-Day-v2.1.0-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.0/E2-Day-v2.1.0-win-arm64.zip) |
+| Intel / AMD 处理器的 64 位 Windows 电脑 | [E2-Day-v2.1.1-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.1/E2-Day-v2.1.1-win-x64.zip) |
+| Snapdragon 等 ARM 处理器的 Windows ARM64 电脑 | [E2-Day-v2.1.1-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.1/E2-Day-v2.1.1-win-arm64.zip) |
 
 1. 在 Windows“设置 → 系统 → 关于 → 系统类型”中确认电脑架构，选择对应下载包。
 2. **完整解压**到一个固定文件夹，保留程序旁边的 DLL、图标和 `Data` 文件夹。

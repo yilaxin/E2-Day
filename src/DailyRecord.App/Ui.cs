@@ -37,11 +37,18 @@ internal static class Ui
         button.Click += (_, _) => action();
         return button;
     }
-    public static Border Card(UIElement child, Thickness? padding = null) => new()
+    public static Border Card(UIElement child, Thickness? padding = null)
     {
-        Child = child, Background = Surface, BorderBrush = Line, BorderThickness = new Thickness(1),
-        CornerRadius = new CornerRadius(14), Padding = padding ?? new Thickness(20), Margin = new Thickness(0, 0, 0, 14)
-    };
+        var glass = Application.Current.TryFindResource("GlassCard") as Style;
+        var card = new Border
+        {
+            Child = child, Background = Surface, BorderThickness = new Thickness(1), Style = glass,
+            CornerRadius = new CornerRadius(glass is null ? 14 : 18), Padding = padding ?? new Thickness(20),
+            Margin = new Thickness(0, 0, 0, 14)
+        };
+        if (glass is null) card.BorderBrush = Line;
+        return card;
+    }
     public static StackPanel Stack(params UIElement[] children)
     {
         var panel = new StackPanel();

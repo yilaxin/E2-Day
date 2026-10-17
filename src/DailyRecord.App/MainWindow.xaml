@@ -3,10 +3,24 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="E²-Day" Width="1360" Height="940" MinWidth="1000" MinHeight="650" Style="{StaticResource {x:Type Window}}"
         WindowStartupLocation="CenterScreen">
-  <Grid Background="{StaticResource PageBrush}">
-    <Grid.ColumnDefinitions><ColumnDefinition Width="204" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-    <Border Background="{StaticResource SidebarBrush}" BorderBrush="{StaticResource SidebarLineBrush}" BorderThickness="0,0,1,0">
-      <Grid Margin="20,30,20,20">
+  <Grid Background="{StaticResource PageBrush}" ClipToBounds="True">
+    <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+    <!-- Static, soft-edged shapes sit behind the glass. No blur is applied to content or calendar cells. -->
+    <Viewbox Grid.ColumnSpan="2" Stretch="Fill" IsHitTestVisible="False" Focusable="False">
+      <Canvas Width="1360" Height="940" ClipToBounds="True">
+        <Ellipse Width="850" Height="720" Canvas.Left="790" Canvas.Top="-225">
+          <Ellipse.Fill><RadialGradientBrush><GradientStop Color="#DCEDA0D2" Offset="0" /><GradientStop Color="#00EDA0D2" Offset="1" /></RadialGradientBrush></Ellipse.Fill>
+        </Ellipse>
+        <Ellipse Width="800" Height="690" Canvas.Left="-220" Canvas.Top="420">
+          <Ellipse.Fill><RadialGradientBrush><GradientStop Color="#C6A8B4F2" Offset="0" /><GradientStop Color="#00A8B4F2" Offset="1" /></RadialGradientBrush></Ellipse.Fill>
+        </Ellipse>
+        <Ellipse Width="950" Height="620" Canvas.Left="450" Canvas.Top="650">
+          <Ellipse.Fill><RadialGradientBrush><GradientStop Color="#C8F09BBE" Offset="0" /><GradientStop Color="#00F09BBE" Offset="1" /></RadialGradientBrush></Ellipse.Fill>
+        </Ellipse>
+      </Canvas>
+    </Viewbox>
+    <Border Background="{StaticResource SidebarBrush}" BorderBrush="{StaticResource SidebarLineBrush}" BorderThickness="1" CornerRadius="24" Margin="14,14,0,14">
+      <Grid Margin="16,22,16,18">
         <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
         <StackPanel>
           <Image Source="/Assets/e2-day-logo.png" Width="56" Height="56" HorizontalAlignment="Left" Margin="0,0,0,12"
@@ -23,7 +37,7 @@
         </StackPanel>
       </Grid>
     </Border>
-    <Grid Grid.Column="1" Margin="32,26,28,18">
+    <Grid Grid.Column="1" Margin="24,28,22,18">
       <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
       <Grid Margin="0,0,0,20">
         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
