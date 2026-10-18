@@ -23,13 +23,14 @@ public partial class MainWindow
         var today = _service.Today;
         _analyticsYear ??= today.Year; _analyticsHabitMonth ??= new DateOnly(today.Year, today.Month, 1);
         var data = new TaskAnalytics(_service.State, today);
-        var from = _analyticsPeriod switch
-        {
-            0 => today.AddDays(-6), 1 => today.AddDays(-29), 2 => new DateOnly(today.Year, today.Month, 1),
-            _ => new DateOnly(today.Year, 1, 1)
-        };
+        var from = AnalyticsRangeStart(today, _analyticsPeriod);
         var entries = data.Between(from, today);
         Header("每一份完成，都有迹可循", "数据概览", "看见完成的轨迹，整理积压的事情，记录长期任务的坚持。");
+        Button? copy = null;
+        copy = Ui.Button("复制为图片", async () => await CopyImageAsync(copy!, () => TaskShareImage.Render(BuildAnalyticsShareImage(), AnalyticsShareWidth)));
+        copy.Tag = "copy-analytics-image";
+        copy.ToolTip = "复制所选时间范围的统计与图表，含当前选中长期任务的名称；积压单独标明截至今天";
+        HeaderActions.Children.Add(copy);
         var filters = new WrapPanel { Margin = new Thickness(0, 0, 0, 16) };
         var options = new[] { "近 7 天", "近 30 天", "本月", "今年" };
         for (var i = 0; i < options.Length; i++)
@@ -42,19 +43,7 @@ public partial class MainWindow
         var range = Ui.Text($"{from:M/d} — {today:M/d}  ·  上方统计与趋势范围", 11, Ui.Muted);
         range.Margin = new Thickness(10, 0, 0, 0); filters.Children.Add(range); PageBody.Children.Add(filters);
 
-        var metrics = new UniformGrid { Columns = 4, Margin = new Thickness(0, 0, 0, 16) };
-        var numbers = new[] { ("本期完成", entries.Count, "项任务", "analytics-total"),
-            ("其中重要", entries.Count(c => c.WasImportant), "以完成时的星标为准", "analytics-important"),
-            ("当前逾期", data.OverdueCount, "不限上方时间范围", "analytics-overdue"),
-            ("有完成记录", entries.Select(c => c.Day).Distinct().Count(), "天 · 在所选时间范围内", "analytics-days") };
-        for (var i = 0; i < numbers.Length; i++)
-        {
-            var metric = numbers[i]; var value = Ui.Text(metric.Item2.ToString(), 29, i == 2 ? Ui.Amber : Ui.Accent, true);
-            value.Tag = metric.Item4;
-            var card = Ui.Card(Ui.Stack(Ui.Text(metric.Item1, 12, Ui.Muted), value, Ui.Text(metric.Item3, 10, Ui.Muted)), new Thickness(17, 14, 17, 14));
-            card.Margin = new Thickness(0, 0, i == 3 ? 0 : 12, 0); metrics.Children.Add(card);
-        }
-        PageBody.Children.Add(metrics);
+        PageBody.Children.Add(BuildAnalyticsMetrics(data, entries));
         var trend = BuildCompletionTrend(data, from, today);
         var backlog = BuildBacklog(data);
         if (_wide)
@@ -71,6 +60,29 @@ public partial class MainWindow
         note.Margin = new Thickness(2, 0, 2, 12); PageBody.Children.Add(note);
     }
 
+    private static DateOnly AnalyticsRangeStart(DateOnly today, int period) => period switch
+    {
+        0 => today.AddDays(-6), 1 => today.AddDays(-29), 2 => new DateOnly(today.Year, today.Month, 1),
+        _ => new DateOnly(today.Year, 1, 1)
+    };
+
+    private static UniformGrid BuildAnalyticsMetrics(TaskAnalytics data, IReadOnlyList<CompletionEntry> entries, bool sharing = false)
+    {
+        var metrics = new UniformGrid { Columns = 4, Margin = new Thickness(0, 0, 0, 16) };
+        var numbers = new[] { ("本期完成", entries.Count, "项任务", "analytics-total"),
+            ("其中重要", entries.Count(c => c.WasImportant), "以完成时的星标为准", "analytics-important"),
+            ("当前逾期", data.OverdueCount, sharing ? $"截至 {data.Today:yyyy/M/d}" : "不限上方时间范围", "analytics-overdue"),
+            ("有完成记录", entries.Select(c => c.Day).Distinct().Count(), "天 · 在所选时间范围内", "analytics-days") };
+        for (var i = 0; i < numbers.Length; i++)
+        {
+            var metric = numbers[i]; var value = Ui.Text(metric.Item2.ToString(), 29, i == 2 ? Ui.Amber : Ui.Accent, true);
+            value.Tag = metric.Item4;
+            var card = Ui.Card(Ui.Stack(Ui.Text(metric.Item1, 12, Ui.Muted), value, Ui.Text(metric.Item3, 10, Ui.Muted)), new Thickness(17, 14, 17, 14));
+            card.Margin = new Thickness(0, 0, i == 3 ? 0 : 12, 0); metrics.Children.Add(card);
+        }
+        return metrics;
+    }
+
     private static Border AnalyticsSection(string title, string subtitle, UIElement content, UIElement? actions = null)
     {
         var header = new Grid { Margin = new Thickness(0, 0, 0, 16) };
@@ -80,7 +92,7 @@ public partial class MainWindow
         return Ui.Card(Ui.Stack(header, content), new Thickness(20));
     }
 
-    private Border BuildCompletionTrend(TaskAnalytics data, DateOnly from, DateOnly to)
+    private Border BuildCompletionTrend(TaskAnalytics data, DateOnly from, DateOnly to, bool sharing = false)
     {
         var days = data.Daily(from, to);
         var bins = _analyticsPeriod == 3
@@ -111,12 +123,12 @@ public partial class MainWindow
             System.Windows.Automation.AutomationProperties.SetName(button, button.ToolTip.ToString());
             Grid.SetColumn(button, i); chart.Children.Add(button);
         }
-        var caption = Ui.Text(days.Sum(d => d.Count) == 0 ? "这段时间还没有完成记录。完成一件任务后，这里就会留下轨迹。" : "点击柱形查看对应事项；同一任务反复完成与撤销不会重复计数。", 10, Ui.Muted);
+        var caption = Ui.Text(days.Sum(d => d.Count) == 0 ? "这段时间还没有完成记录。" : sharing ? "按实际完成日期汇总 · 已撤销的完成不计入" : "点击柱形查看对应事项；同一任务反复完成与撤销不会重复计数。", 10, Ui.Muted);
         caption.Margin = new Thickness(0, 10, 0, 0);
         return AnalyticsSection("完成趋势", _analyticsPeriod == 3 ? "今年按月汇总 · 截至今天" : "每天实际完成的任务数量", Ui.Stack(chart, caption));
     }
 
-    private Border BuildBacklog(TaskAnalytics data)
+    private Border BuildBacklog(TaskAnalytics data, bool sharing = false)
     {
         var panel = new StackPanel(); var maximum = Math.Max(1, data.Backlog.Max(g => g.Tasks.Count));
         foreach (var group in data.Backlog)
@@ -135,8 +147,8 @@ public partial class MainWindow
             button.Margin = new Thickness(0, 0, 0, 4); button.HorizontalContentAlignment = HorizontalAlignment.Stretch;
             button.ToolTip = $"{group.Label}：{group.Tasks.Count} 项，点击查看并处理"; panel.Children.Add(button);
         }
-        panel.Children.Add(Ui.Text("当前存量 · 不受顶部时间筛选影响\n未来提醒与过去的长期任务不计入积压。", 10, Ui.Muted));
-        return AnalyticsSection("待办与积压", $"到期未完成 {data.Backlog.Sum(g => g.Tasks.Count)} 项 · 点击分组查看", panel);
+        panel.Children.Add(Ui.Text(sharing ? "当前存量 · 独立于所选统计区间\n未来提醒与过去的长期任务不计入积压。" : "当前存量 · 不受顶部时间筛选影响\n未来提醒与过去的长期任务不计入积压。", 10, Ui.Muted));
+        return AnalyticsSection("待办与积压", sharing ? $"截至 {data.Today:yyyy/M/d} · 到期未完成 {data.Backlog.Sum(g => g.Tasks.Count)} 项" : $"到期未完成 {data.Backlog.Sum(g => g.Tasks.Count)} 项 · 点击分组查看", panel);
     }
 
     private Border BuildCompletionHeatmap(TaskAnalytics data)

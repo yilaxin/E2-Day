@@ -86,18 +86,18 @@ internal static class TaskShareImage
         body.Children.Add(new Border { Height = 10 });
     }
 
-    public static BitmapSource Render(FrameworkElement root)
+    public static BitmapSource Render(FrameworkElement root, double layoutWidth = LayoutWidth)
     {
-        root.Measure(new Size(LayoutWidth, double.PositiveInfinity));
+        root.Measure(new Size(layoutWidth, double.PositiveInfinity));
         var height = Math.Ceiling(root.DesiredSize.Height);
-        root.Arrange(new Rect(0, 0, LayoutWidth, height)); root.UpdateLayout();
+        root.Arrange(new Rect(0, 0, layoutWidth, height)); root.UpdateLayout();
         // Bound bitmap memory while keeping the complete list, including its footer.
-        var scale = Math.Min(1.5, Math.Min(16000 / height, Math.Sqrt(40_000_000 / (LayoutWidth * height))));
-        var widthPixels = Math.Max(1, (int)Math.Ceiling(LayoutWidth * scale));
+        var scale = Math.Min(1.5, Math.Min(16000 / height, Math.Sqrt(40_000_000 / (layoutWidth * height))));
+        var widthPixels = Math.Max(1, (int)Math.Ceiling(layoutWidth * scale));
         var heightPixels = Math.Max(1, (int)Math.Ceiling(height * scale));
         var bitmap = new RenderTargetBitmap(widthPixels, heightPixels, 96 * scale, 96 * scale, PixelFormats.Pbgra32);
         var background = new DrawingVisual();
-        using (var context = background.RenderOpen()) context.DrawRectangle(Brushes.White, null, new Rect(0, 0, LayoutWidth, height));
+        using (var context = background.RenderOpen()) context.DrawRectangle(Brushes.White, null, new Rect(0, 0, layoutWidth, height));
         bitmap.Render(background); bitmap.Render(root); bitmap.Freeze();
         return bitmap;
     }
@@ -131,12 +131,15 @@ public partial class MainWindow
 {
     internal TaskImageClipboard ImageClipboard { get; set; } = new();
 
-    private async Task CopyTodayTasksImageAsync(Button button)
+    private Task CopyTodayTasksImageAsync(Button button) => CopyImageAsync(button, () => TaskShareImage.Render(TaskShareImage.Build(_service, _holidays)));
+
+    private async Task CopyImageAsync(Button button, Func<BitmapSource> render)
     {
+        var tooltip = button.ToolTip;
         button.IsEnabled = false;
         try
         {
-            var bitmap = TaskShareImage.Render(TaskShareImage.Build(_service, _holidays));
+            var bitmap = render();
             await ImageClipboard.CopyAsync(bitmap, _lifetime.Token);
             button.Content = "✓ 已复制图片"; button.ToolTip = "可在聊天窗口按 Ctrl+V 粘贴";
             if (_smoke) return;
@@ -151,7 +154,7 @@ public partial class MainWindow
         }
         finally
         {
-            if (!_smoke || !Equals(button.Content, "✓ 已复制图片")) button.Content = "复制为图片";
+            if (!_smoke || !Equals(button.Content, "✓ 已复制图片")) { button.Content = "复制为图片"; button.ToolTip = tooltip; }
             button.IsEnabled = true;
         }
     }

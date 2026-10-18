@@ -65,7 +65,7 @@ internal static partial class SmokeTest
         await VerifyTaskShare(window, service, holidays, clock, outputDirectory);
         await VerifyNoteImages(window, service, holidays, outputDirectory);
         VerifyLongTermTasks(window, service, clock, outputDirectory);
-        VerifyAnalytics(window, service, store, holidays, clock, outputDirectory);
+        await VerifyAnalytics(window, service, store, holidays, clock, outputDirectory);
 
         foreach (var page in Enum.GetValues<PageKind>())
         {

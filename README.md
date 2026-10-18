@@ -39,12 +39,12 @@ Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese
 
 ## 下载与开始使用
 
-Windows 日常版：**2.1.2**，新增数据概览和长期任务打卡，延续粉紫玻璃主题，保留原有任务、日历、图文备注、本机账号和文件交换。鸿蒙原生版仍为 0.1.1。下方提供对应 Windows 程序包。程序采用免安装、自包含的文件夹发布方式，下载包内已包含所需的 .NET 运行依赖。
+Windows 日常版：**2.1.3**，新增数据概览一键复制图片，支持按所选范围分享统计与图表，保留粉紫玻璃主题和原有任务、日历、图文备注与文件交换。鸿蒙原生版仍为 0.1.1。下方提供对应 Windows 程序包。程序采用免安装、自包含的文件夹发布方式，下载包内已包含所需的 .NET 运行依赖。
 
 | 你的电脑 | 下载文件 |
 | --- | --- |
-| Intel / AMD 处理器的 64 位 Windows 电脑 | [E2-Day-v2.1.2-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.2/E2-Day-v2.1.2-win-x64.zip) |
-| Snapdragon 等 ARM 处理器的 Windows ARM64 电脑 | [E2-Day-v2.1.2-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.2/E2-Day-v2.1.2-win-arm64.zip) |
+| Intel / AMD 处理器的 64 位 Windows 电脑 | [E2-Day-v2.1.3-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.3/E2-Day-v2.1.3-win-x64.zip) |
+| Snapdragon 等 ARM 处理器的 Windows ARM64 电脑 | [E2-Day-v2.1.3-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.3/E2-Day-v2.1.3-win-arm64.zip) |
 
 1. 在 Windows“设置 → 系统 → 关于 → 系统类型”中确认电脑架构，选择对应下载包。
 2. **完整解压**到一个固定文件夹，保留程序旁边的 DLL、图标和 `Data` 文件夹。
@@ -100,6 +100,15 @@ Windows 日常版：**2.1.2**，新增数据概览和长期任务打卡，延续
 完成趋势和热力图按**实际完成日**归属，长期打卡按**原安排日**归属；看过提醒、取消与结束不等于完成，撤销完成后相应数据减少。未来提醒和过去遗漏的长期任务不会累积为逾期。当前积压不限时间，热力图年份和打卡月份单独切换，空白表示没有完成记录。
 
 ![数据概览完整示例](docs/images/analytics-full.png)
+
+**数据概览一键分享（2.1.3）**：在数据概览选择近 7 天、近 30 天、本月或今年，点击右上角“复制为图片”，即可在聊天窗口 Ctrl+V。图片包含统计与图表，热力图和长期打卡按同一范围排版；积压单独标明截至今天。带上当前选中的长期任务名称，不加入任务清单、备注图片或账号信息。
+
+<details>
+<summary>查看数据概览分享图示例（隔离数据）</summary>
+
+![数据概览分享图片](docs/images/analytics-share-30d.png)
+
+</details>
 
 所有图表均在当前账号本机计算，不生成历史任务，也不将个人统计发往网络。
 

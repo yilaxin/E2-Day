@@ -7,7 +7,7 @@ namespace DailyRecord.App;
 
 internal static partial class SmokeTest
 {
-    private static void VerifyAnalytics(MainWindow window, TaskService service, SqliteStore store, HolidayService holidays, PreviewClock clock, string output)
+    private static async Task VerifyAnalytics(MainWindow window, TaskService service, SqliteStore store, HolidayService holidays, PreviewClock clock, string output)
     {
         void Check(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
         string Value(string tag) => Descendants(window).OfType<TextBlock>().Single(t => Equals(t.Tag, tag)).Text;
@@ -20,6 +20,9 @@ internal static partial class SmokeTest
             window.Navigate(PageKind.Analytics); Prepare(window);
             Check(Value("analytics-total") == "0" && Value("analytics-overdue") == "0", "空账号的统计不是零。");
             Render((FrameworkElement)window.Content, 1400, 940, Path.Combine(output, "analytics-empty.png"));
+            var emptyShare = window.BuildAnalyticsShareImage();
+            Check(Descendants(emptyShare).OfType<TextBlock>().Single(t => Equals(t.Tag, "analytics-total")).Text == "0", "空账号分享不是零值。");
+            SaveBitmap(TaskShareImage.Render(emptyShare, MainWindow.AnalyticsShareWidth), Path.Combine(output, "analytics-share-empty.png"));
             var habit = new EventDefinition { Title = "每天阅读 20 分钟", StartDate = today.AddDays(-28), Repeat = RepeatRule.Daily };
             service.State.Events.Add(habit);
             var names = new[] { "整理研究笔记", "完成学习清单", "散步与运动", "推进本周计划", "阅读并摘录", "整理文件", "完成一次练习" };
@@ -47,6 +50,8 @@ internal static partial class SmokeTest
             Check(!FindButton(window, "analytics-heat:" + today.AddDays(1).ToString("yyyy-MM-dd")).IsEnabled, "未来热力格可误当作已有记录。");
             Render((FrameworkElement)window.Content, 1400, 940, Path.Combine(output, "analytics.png"));
             Render((FrameworkElement)window.Content, 1400, 1500, Path.Combine(output, "analytics-full.png"));
+            Prepare(window);
+            await VerifyAnalyticsShare(window, service, clock, output);
             window.AnalyticsDetailsPresenter = dialog => details = dialog;
             Click(window, "analytics-heat:" + today.ToString("yyyy-MM-dd"));
             Check(details is not null && Descendants(details).OfType<Button>().Any(b => b.Tag is string tag && tag.StartsWith("complete:")), "热力图没有打开对应的完成事项。");
