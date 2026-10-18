@@ -9,7 +9,7 @@ using DailyRecord.Core;
 
 namespace DailyRecord.App;
 
-internal static class TutorSmoke
+internal static partial class TutorSmoke
 {
     private static int _checks;
     private static void Check(bool condition, string text) { if (!condition) throw new InvalidOperationException(text); _checks++; }
@@ -87,6 +87,7 @@ internal static class TutorSmoke
         var preview = NoteImages.CreatePreview(null, store.Images(taught.ImageIds).Single()); Prepare(preview); Check(preview.Content is not null, "图片预览失败");
         var before = service.State.Lessons.Count; var backup = Path.Combine(store.DirectoryPath, "ui-roundtrip.json"); store.Export(backup, service.State); service.Restore(backup); Check(service.State.Lessons.Count == before && store.Images(taught.ImageIds).Count == 1, "界面图文备份往返失败");
         window.Width = 1000; window.Height = 650; window.Navigate(0); Snapshot(window, Path.Combine(output, "tutor-compact.png")); Check(window.ActualWidth >= 0, "小窗口布局失败");
+        await VerifyAppearanceAndScrolling(window, service, output);
         var result = $"PASS Tutor WPF: {_checks} checks\nVersion: {Assembly.GetExecutingAssembly().GetName().Version}\nArchitecture: {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}\nIsolatedData: {store.DirectoryPath}\nStudents: {service.State.Students.Count}\nLessons: {service.State.Lessons.Count}\nScreenshots: 9\n"; File.WriteAllText(Path.Combine(output, "result.txt"), result);
         await Task.CompletedTask;
     }

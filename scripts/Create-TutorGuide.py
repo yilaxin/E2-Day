@@ -86,7 +86,7 @@ def page(number, title, subtitle):
     para(subtitle, size=10.5, color=MUTED, gap=17)
     c.setStrokeColor(LINE); c.line(M, 47, W-M, 47)
     c.setFont('CN', 8); c.setFillColor(MUTED)
-    c.drawString(M, 31, f'适用家教版 {VERSION}  ·  2026-10-15')
+    c.drawString(M, 31, f'适用家教版 {VERSION}  ·  2026-10-18')
     c.drawRightString(W-M, 31, f'{number} / 7')
     c.bookmarkPage(f'page{number}')
     c.addOutlineEntry(title, f'page{number}', level=0)

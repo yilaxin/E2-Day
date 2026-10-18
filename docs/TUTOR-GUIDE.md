@@ -1,12 +1,12 @@
 # E²-Day 家教版使用说明
 
-当前版本 **1.0.3**。面向一对一家教老师，记录学生、课程、课后反馈与授课收入。仅支持 Windows 64 位电脑，提供 x64 和 ARM64 自包含免安装程序包。
+当前版本 **1.0.4**。界面同步日常版的粉紫渐变、玻璃卡片、圆角侧边栏及输入控件；各主页面支持连续、反向平滑滚动，遵循 Windows 动画设置。面向一对一家教老师，记录学生、课程、课后反馈与授课收入。仅支持 Windows 64 位电脑，提供 x64 和 ARM64 自包含免安装程序包。
 
 首次使用推荐阅读[七页图文 PDF 教程](E2-Day-Tutor-Guide.pdf)。发布页提供可单独下载的 PDF，两种程序包内也含“先读我.txt”和“安装与使用教程.pdf”，可离线阅读。
 
 ## 下载与打开
 
-发布页：[家教版 1.0.3](https://github.com/yilaxin/E2-Day/releases/tag/tutor-v1.0.3)。Intel / AMD 电脑下载 `win-x64.zip`，Snapdragon 等 ARM 电脑下载 `win-arm64.zip`。完整解压后双击 **E2Day.Tutor.exe**，保留旁边的依赖文件和 Data 文件夹；无需另装 .NET。
+发布页：[家教版 1.0.4](https://github.com/yilaxin/E2-Day/releases/tag/tutor-v1.0.4)。Intel / AMD 电脑下载 `win-x64.zip`，Snapdragon 等 ARM 电脑下载 `win-arm64.zip`。完整解压后双击 **E2Day.Tutor.exe**，保留旁边的依赖文件和 Data 文件夹；无需另装 .NET。
 
 家教版使用原版 E²-Day logo，不带额外角标。可对 exe 右键创建桌面快捷方式，命名为“E²-Day Teacher”。程序文件仍为 E2Day.Tutor.exe，教程中的家教版界面与操作继续适用。日常版程序仍为 DailyRecord.exe，两者可同时打开。
 
@@ -116,4 +116,4 @@
 ./scripts/Publish-GitHub.ps1 -Edition Tutor
 ```
 
-程序包位于 `artifacts/releases/tutor-v1.0.3`，发布标签为 `tutor-v1.0.3`，普通版仍使用原来的版本与标签。家教版发布不会替换仓库“最新版”的日常版入口。
+程序包位于 `artifacts/releases/tutor-v1.0.4`，发布标签为 `tutor-v1.0.4`，普通版仍使用原来的版本与标签。家教版发布不会替换仓库“最新版”的日常版入口。

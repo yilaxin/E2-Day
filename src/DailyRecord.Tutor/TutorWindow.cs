@@ -23,6 +23,8 @@ public sealed class TutorWindow : Window
     private readonly Dictionary<int, Button> _nav = [];
     private readonly ScrollViewer _scroller;
     private readonly DispatcherTimer _timer;
+    internal SmoothWheelScroller PageScroll { get; }
+    internal ScrollViewer PageScroller => _scroller;
     private int _page;
     private DateOnly _month;
     private DateOnly? _selectedDate;
@@ -46,26 +48,28 @@ public sealed class TutorWindow : Window
         _holidays = new HolidayService(Path.Combine(AppContext.BaseDirectory, "Data", "Holidays"), Path.Combine(store.DirectoryPath, "Holidays"));
         Title = "E²-Day 家教版"; Width = Math.Min(1380, SystemParameters.WorkArea.Width - 32); Height = Math.Min(940, SystemParameters.WorkArea.Height - 32); MinWidth = 1000; MinHeight = 650;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
-        var layout = new Grid { Background = Ui.Page }; layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(206) }); layout.ColumnDefinitions.Add(new ColumnDefinition()); Content = layout;
-        var sidebarGrid = new Grid { Margin = new Thickness(20, 30, 18, 20) }; sidebarGrid.RowDefinitions.Add(new RowDefinition()); sidebarGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        var sidebar = Ui.Stack(new Image { Source = new System.Windows.Media.Imaging.BitmapImage(new Uri("pack://application:,,,/Assets/e2-day-logo.png")), Width = 52, Height = 52, HorizontalAlignment = HorizontalAlignment.Left },
+        var layout = new Grid { Background = Ui.Page, ClipToBounds = true }; layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) }); layout.ColumnDefinitions.Add(new ColumnDefinition()); Content = layout;
+        var backdrop = TutorAppearance.Backdrop(); Grid.SetColumnSpan(backdrop, 2); layout.Children.Add(backdrop);
+        var sidebarGrid = new Grid { Margin = new Thickness(16, 22, 16, 18) }; sidebarGrid.RowDefinitions.Add(new RowDefinition()); sidebarGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var sidebar = Ui.Stack(new Image { Source = new System.Windows.Media.Imaging.BitmapImage(new Uri("pack://application:,,,/Assets/e2-day-logo.png")), Width = 56, Height = 56, HorizontalAlignment = HorizontalAlignment.Left },
             Ui.Text("E²-Day", 26, Ui.Accent, true), Ui.Text("家教版  /  TUTOR", 12, Ui.Amber, true), Ui.Text("记录每一堂课\n看见每一步成长", 12, Ui.Muted));
         sidebar.Children[0].SetValue(MarginProperty, new Thickness(0, 0, 0, 12)); sidebar.Children[3].SetValue(MarginProperty, new Thickness(0, 12, 0, 28));
         var labels = new[] { "◷  今日授课", "▦  授课日历", "♧  学生档案", "▥  收入统计", "≡  教学记录", "⚙  设置与备份" };
         for (var i = 0; i < labels.Length; i++) { var destination = i; var b = Ui.Button(labels[i], () => Navigate(destination)); b.Tag = "nav:" + i; b.HorizontalContentAlignment = HorizontalAlignment.Left; b.Margin = new Thickness(0, 0, 0, 10); b.Padding = new Thickness(12); sidebar.Children.Add(b); _nav[i] = b; }
         sidebarGrid.Children.Add(sidebar);
         var footer = Ui.Stack(Ui.Text("●  独立本地记录", 11, Ui.Accent), _saved); Grid.SetRow(footer, 1); sidebarGrid.Children.Add(footer);
-        var sidebarBorder = new Border { Background = (Brush)Application.Current.FindResource("SidebarBrush"), BorderBrush = Ui.Line, BorderThickness = new Thickness(0, 0, 1, 0), Child = sidebarGrid }; layout.Children.Add(sidebarBorder);
-        var main = new Grid { Margin = new Thickness(28, 28, 28, 20) }; Grid.SetColumn(main, 1); layout.Children.Add(main);
+        var sidebarBorder = new Border { Background = (Brush)Application.Current.FindResource("SidebarBrush"), BorderBrush = (Brush)Application.Current.FindResource("SidebarLineBrush"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(24), Margin = new Thickness(14, 14, 0, 14), Child = sidebarGrid }; layout.Children.Add(sidebarBorder);
+        var main = new Grid { Margin = new Thickness(24, 28, 22, 18) }; Grid.SetColumn(main, 1); layout.Children.Add(main);
         main.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); main.RowDefinitions.Add(new RowDefinition());
-        var header = new Grid { Margin = new Thickness(0, 0, 0, 22) }; header.ColumnDefinitions.Add(new ColumnDefinition()); header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var header = new Grid { Margin = new Thickness(0, 0, 0, 20) }; header.ColumnDefinitions.Add(new ColumnDefinition()); header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _subtitle.Margin = new Thickness(0, 9, 0, 0); header.Children.Add(Ui.Stack(_title, _subtitle)); Grid.SetColumn(_actions, 1); _actions.Margin = new Thickness(12, 0, 0, 0); header.Children.Add(_actions); main.Children.Add(header);
         _scroller = new ScrollViewer { Content = _body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }; Grid.SetRow(_scroller, 1); main.Children.Add(_scroller);
+        PageScroll = new SmoothWheelScroller(_scroller, () => true);
         var last = Today; _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
-        _timer.Tick += (_, _) => { if (last != Today) { last = Today; if (!OwnedWindows.Cast<Window>().Any()) Render(); } }; _timer.Start(); Closed += (_, _) => _timer.Stop();
+        _timer.Tick += (_, _) => { if (last != Today) { last = Today; if (!OwnedWindows.Cast<Window>().Any()) Render(); } }; _timer.Start(); Closed += (_, _) => { _timer.Stop(); PageScroll.Dispose(); };
         Navigate(0);
     }
-    internal void Navigate(int page) { _page = page; _scroller.ScrollToTop(); Render(); }
+    internal void Navigate(int page) { PageScroll.Stop(); _page = page; _scroller.ScrollToTop(); Render(); }
     internal void SelectDate(DateOnly date) { _month = new(date.Year, date.Month, 1); _selectedDate = date; _year = false; Navigate(1); }
     internal void SelectStudent(string id) { _student = id; Navigate(2); }
     internal void Run(Action action)
@@ -79,6 +83,7 @@ public sealed class TutorWindow : Window
     private static string Status(TutorLesson l) => l.Status switch { LessonStatus.Taught => "已授课", LessonStatus.Cancelled => "已取消", _ => "待上课" };
     private void Render()
     {
+        PageScroll.Stop();
         _body.Children.Clear(); _actions.Children.Clear(); _saved.Text = _service.SaveStatus;
         foreach (var pair in _nav) { pair.Value.Background = pair.Key == _page ? Ui.Selected : Brushes.Transparent; pair.Value.Foreground = pair.Key == _page ? Ui.Accent : Ui.Muted; }
         switch (_page) { case 0: TodayPage(); break; case 1: CalendarPage(); break; case 2: StudentPage(); break; case 3: StatisticsPage(); break; case 4: RecordsPage(); break; default: SettingsPage(); break; }
