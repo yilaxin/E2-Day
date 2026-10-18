@@ -42,6 +42,21 @@
         <Setter.Value><DropShadowEffect Color="#6B528E" BlurRadius="16" ShadowDepth="3" Opacity="0.075" /></Setter.Value>
       </Setter>
     </Style>
+    <Style x:Key="TeachingHeatCell" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Cell" CornerRadius="4" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Cell" Property="BorderBrush" Value="{StaticResource AccentBrush}" /><Setter TargetName="Cell" Property="BorderThickness" Value="2" /></Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Cell" Property="BorderBrush" Value="{StaticResource AccentBrush}" /><Setter TargetName="Cell" Property="BorderThickness" Value="2" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
     <Style TargetType="Window">
       <Setter Property="Icon" Value="pack://siteoforigin:,,,/e2-day-tutor.ico" />
       <Setter Property="FontFamily" Value="Microsoft YaHei UI, Segoe UI" />

@@ -87,7 +87,7 @@ def page(number, title, subtitle):
     c.setStrokeColor(LINE); c.line(M, 47, W-M, 47)
     c.setFont('CN', 8); c.setFillColor(MUTED)
     c.drawString(M, 31, f'适用家教版 {VERSION}  ·  2026-10-18')
-    c.drawRightString(W-M, 31, f'{number} / 7')
+    c.drawRightString(W-M, 31, f'{number} / 8')
     c.bookmarkPage(f'page{number}')
     c.addOutlineEntry(title, f'page{number}', level=0)
 
@@ -103,7 +103,7 @@ link('下载 x64 版（普通 Intel / AMD 电脑）', f'{BASE}/E2-Day-Tutor-v{VE
 link('下载 ARM64 版（高通等 ARM 电脑）', f'{BASE}/E2-Day-Tutor-v{VERSION}-win-arm64.zip')
 section('03  完整解压，再打开程序')
 para('等待下载完成。右键 ZIP →「全部解压缩」，选择自己能写入的固定文件夹，例如“文档”中的 E2-Day-Tutor。进入解压后的文件夹，双击 <b>E2Day.Tutor.exe</b>。')
-box('保留旁边所有 DLL、Data、images 等文件。不要在 ZIP 压缩包里直接运行，也不要只把 exe 单独拷到桌面。桌面快捷方式的创建方法见第 6 页。', gold=True)
+box('保留旁边所有 DLL、Data、images 等文件。不要在 ZIP 压缩包里直接运行，也不要只把 exe 单独拷到桌面。桌面快捷方式的创建方法见第 7 页。', gold=True)
 para('同一文件夹内的“先读我.txt”和这份 PDF 可以离线阅读。遇到 Windows 安全提示，继续看下一页。', size=9.5, color=MUTED)
 
 page(2, '首次启动与本机账号', '遇到提示先看清文字，再决定下一步。')
@@ -147,7 +147,17 @@ shot('tutor-income.png', 260, '收入统计示例：按日期及学生筛选，�
 box('<b>授课收入不等于已经收到的钱。</b>本版不记录实际到账、欠费、课包或退款。每节课按“分钟数 × 时薪 ÷ 60”计算并四舍五入到分，再累加汇总。', gold=True)
 para('过去未确认的课程不会自动挪到今天，也不会自动计费。可在首页查看近期摘要，或到「教学记录 → 待确认课程」逐节补录、改期或取消。')
 
-page(6, '桌面入口、备份与换电脑', '用快捷方式打开，把备份保存在程序文件夹之外。')
+page(6, '教学概览，把记录变成图表', '不用重复录入，就能查看授课节奏、学生投入和课后跟进。')
+section('先选日期与学生')
+para('进入侧栏「教学概览」，选择今天、本周、本月、本年或自选日期，并可筛选单个学生，点击“查看”。单次最多 366 天；顶部显示已授课、实际课时、待确认课程与待补反馈。')
+shot('tutor-dashboard.png', 215, '教学概览示例：热力日历、课程安排与执行、反馈跟进。向下滚动查看排行和学习需求。')
+section('点击图表，直接跟进')
+para('点击热力格查看当天课程；点击柱形缩小到对应时段；点击课时排行打开学生档案。反馈列表可直接打开课程补写，也可查看所选范围全部待补反馈。进入教学记录后可清除日期条件。')
+box('<b>实际课时：</b>截至今天的已授课记录。<br/><b>待确认：</b>今天之前仍待上课的课程。<br/><b>待上课：</b>今天及未来安排，取消课程不计实际课时。<br/><b>已记录反馈：</b>任一课程反馈项已填写，内部备注不计。')
+section('课时分布与学习需求')
+para('课时排行包含已结课学生的历史记录，同名学生分开统计。当前学习需求使用在教学生现有的基础水平、学习节奏和辅导重点，与日期范围无关，不代表历史进步趋势；辅导重点可多选。查看图表与筛选不会修改教学记录。', size=10)
+
+page(7, '桌面入口、备份与换电脑', '用快捷方式打开，把备份保存在程序文件夹之外。')
 section('在自己的电脑上创建桌面快捷方式')
 para('1. 在固定的解压文件夹中找到 E2Day.Tutor.exe。<br/>2. 右键程序 →「显示更多选项」（如有）→「发送到 → 桌面快捷方式」。<br/>3. 将快捷方式改名为“E²-Day Teacher”。<br/>4. 以后双击桌面图标；不要只移动 exe，也不要删除它指向的程序文件夹。')
 section('定期导出备份')
@@ -160,7 +170,7 @@ section('更新与卸载')
 para('更新前先导出备份并关闭旧版。把新版完整解压到新的固定文件夹，运行新 exe，沿用这台电脑原有家教版本机账号与记录；重新创建或更新桌面快捷方式，确认它指向新版。')
 para('删除程序文件夹只移除程序，不自动删除个人记录。家教版数据根目录为 %LOCALAPPDATA%\\E2DayTutor。准备清理个人数据前，先保存并确认可用的备份。', size=9.5, color=MUTED)
 
-page(7, '卡住时，按这里排查', '把提示文字发给作者，比反复点击更容易解决。')
+page(8, '卡住时，按这里排查', '把提示文字发给作者，比反复点击更容易解决。')
 items = [
 ('ZIP 提示损坏、无法解压', '先删除未下载完整的 ZIP，再从家教版发布页重新下载。需要时核对发布页 SHA256SUMS.txt；校验不一致时不要运行。'),
 ('提示“此应用无法在你的电脑上运行”', '重新检查系统类型并选择 x64 / ARM64。不要把 ARM64 包发给普通 Intel / AMD 电脑使用。'),
@@ -183,4 +193,4 @@ link('Microsoft Support：Smart App Control 常见问题', 'https://support.micr
 c.save()
 docs_out = ROOT / 'docs/E2-Day-Tutor-Guide.pdf'
 shutil.copyfile(OUT, docs_out)
-print(f'Created {OUT} ({OUT.stat().st_size} bytes); 7 pages')
+print(f'Created {OUT} ({OUT.stat().st_size} bytes); 8 pages')

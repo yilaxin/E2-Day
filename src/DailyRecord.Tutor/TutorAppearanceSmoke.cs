@@ -38,7 +38,7 @@ internal static partial class TutorSmoke
             source.RaiseEvent(e);
             if (!e.Handled) { e.RoutedEvent = Mouse.MouseWheelEvent; source.RaiseEvent(e); }
         }
-        for (var page = 0; page < 6; page++)
+        for (var page = 0; page < 7; page++)
         {
             window.Navigate(page); await Settle();
             if (page == 3)
@@ -72,7 +72,7 @@ internal static partial class TutorSmoke
                 viewer.ScrollToBottom(); await Settle(); var bottom = viewer.VerticalOffset;
                 Wheel(source, -120); await Settle(); Check(viewer.VerticalOffset == bottom, "底部滚动越界");
                 Wheel(source, 120); await Settle(); Check(SystemParameters.WheelScrollLines == 0 || viewer.VerticalOffset < bottom, "到底后不能反向滚动");
-                Wheel(source, -120); window.Navigate((page + 1) % 6); await Settle();
+                Wheel(source, -120); window.Navigate((page + 1) % 7); await Settle();
                 Check(!motion.IsAnimating && viewer.VerticalOffset == 0, "切页后旧动画没有停止");
                 reports.Add($"Page {page}: smooth intermediate frames, fine input, immediate reversal, bounds and navigation passed.");
             }

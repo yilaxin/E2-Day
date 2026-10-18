@@ -101,5 +101,93 @@ Test("家长反馈不附带学校地点与内部学习标签", (s, store, a) =>
     var lesson = Lesson(a); lesson.Content = "本节练习内容"; var feedback = lesson.ParentFeedback(s.State.Students.Single().Name);
     Check(feedback.Contains(lesson.Content) && !new[] { a.School, a.TeachingLocation, a.LearningLevel, a.LearningFocus[0] }.Any(feedback.Contains), "复制反馈带入了内部学生资料");
 });
+Test("教学概览区分实际课时、过期待确认、未来安排与反馈", (s, store, a) =>
+{
+    var today = new DateOnly(2026, 10, 15);
+    void Add(int offset, LessonStatus status, int minutes, string content = "")
+    { var l = Lesson(a, today.AddDays(offset)); l.Status = status; l.Minutes = minutes; l.Content = content; s.SaveLesson(l); }
+    Add(-2, LessonStatus.Taught, 60, "反馈"); Add(-1, LessonStatus.Taught, 90);
+    Add(-1, LessonStatus.Planned, 45); Add(0, LessonStatus.Planned, 30); Add(1, LessonStatus.Planned, 60);
+    Add(-1, LessonStatus.Cancelled, 60); Add(1, LessonStatus.Taught, 90);
+    var report = TutorTeachingAnalytics.Build(s, today.AddDays(-2), today.AddDays(2), today);
+    Check(report.Taught == 2 && report.Minutes == 150 && report.Pending.Count == 1 && report.Planned == 2 && report.Cancelled == 1 && report.FutureTaught == 1, "课程状态或日期口径错误");
+    Check(report.MissingFeedback.Count == 1 && report.WithFeedback == 1 && report.TeachingDays == 2 && report.PeakMinutes == 90, "反馈或授课天数错误");
+    Check(report.Days.Count == 5 && report.Days.Last().Minutes == 0 && report.Periods.Sum(p => p.Total) == 6, "零值日期或图表汇总错误");
+});
+Test("教学概览重复预测、改期、取消与只读性", (s, store, a) =>
+{
+    var today = new DateOnly(2026, 10, 15); var l = Lesson(a, new(2026, 10, 1)); l.Status = LessonStatus.Planned; s.AddWeekly(l);
+    var projected = s.Lessons(new(2026, 10, 1), new(2026, 10, 31));
+    var done = projected[1]; done.Status = LessonStatus.Taught; s.SaveLesson(done);
+    var moved = projected[2]; moved.Date = moved.Date.AddDays(1); s.SaveLesson(moved);
+    var cancelled = projected[3]; cancelled.Status = LessonStatus.Cancelled; s.SaveLesson(cancelled);
+    var before = JsonSerializer.Serialize(s.State); var disk = JsonSerializer.Serialize(store.Load()); var saved = s.SaveStatus;
+    var report = TutorTeachingAnalytics.Build(s, new(2026, 10, 1), new(2026, 10, 31), today);
+    Check(report.Taught == 1 && report.Pending.Count == 1 && report.Planned == 2 && report.Cancelled == 1, "预测或已保存实例被重复统计");
+    Check(report.Days.Single(d => d.Date == today).Planned == 0 && report.Days.Single(d => d.Date == today.AddDays(1)).Planned == 1, "改期后原日期仍有安排");
+    Check(before == JsonSerializer.Serialize(s.State) && disk == JsonSerializer.Serialize(store.Load()) && saved == s.SaveStatus, "查看概览修改了教学记录或保存状态");
+});
+Test("教学需求采用当前在教标签、多选和未选择", (s, store, a) =>
+{
+    a.LearningLevel = "中等"; a.LearningFocus = ["基础巩固", "查漏补缺", "同步提高"]; s.SaveStudent(a);
+    s.SaveStudent(new TutorStudent { Name = "已结课", Archived = true, LearningLevel = "优秀", LearningFocus = ["考试冲刺"] });
+    s.SaveStudent(new TutorStudent { Name = "未选择" });
+    s.SaveStudent(new TutorStudent { Name = "拔高学生", LearningLevel = "优秀", LearningPace = TutorStudentProfile.Paces[2], LearningFocus = ["拔高拓展"] });
+    var today = new DateOnly(2026, 10, 15); var report = TutorTeachingAnalytics.Build(s, today, today, today);
+    Check(report.ActiveStudents == 3 && report.Levels.Single(c => c.Label == "优秀").Count == 1 && report.Levels.Single(c => c.Label == "未选择").Count == 1, "需求混入结课学生或丢失未选择");
+    Check(report.Focuses.Where(c => c.Label != "未选择").Sum(c => c.Count) == 4 && report.Focuses.Single(c => c.Label == "考试冲刺").Count == 0, "多选被当成互斥分组");
+    var other = TutorTeachingAnalytics.Build(s, today.AddDays(-20), today.AddDays(-10), today);
+    Check(JsonSerializer.Serialize(other.Levels) == JsonSerializer.Serialize(report.Levels) && report.NoTeaching.Count == 3, "当前标签随日期改变或无课学生错误");
+});
+Test("学生课时保留结课历史、同名学生与学生筛选", (s, store, a) =>
+{
+    a.Name = "同名学生"; s.SaveStudent(a); var b = new TutorStudent { Name = a.Name, Subject = "数学", Archived = true }; s.SaveStudent(b);
+    var idle = new TutorStudent { Name = "无课学生" }; s.SaveStudent(idle);
+    var one = Lesson(a); one.Minutes = 60; s.SaveLesson(one); var two = Lesson(a); two.Minutes = 30; s.SaveLesson(two);
+    var old = Lesson(b); old.Minutes = 120; s.SaveLesson(old);
+    var day = one.Date; var report = TutorTeachingAnalytics.Build(s, day, day, day);
+    Check(report.Students.Count == 2 && report.Students[0].StudentId == b.Id && report.Students[0].Archived && report.Students.Sum(r => r.Minutes) == 210 && report.NoTeaching.Single().Id == idle.Id, "排行合并同名学生、丢失结课历史或汇总错误");
+    var filtered = TutorTeachingAnalytics.Build(s, day, day, day, b.Id);
+    Check(filtered.Taught == 1 && filtered.Minutes == 120 && filtered.ActiveStudents == 0 && filtered.MissingFeedback.Count == 1, "单个学生筛选混入其他记录");
+});
+Test("概览空数据、闰年和日期边界", (s, store, a) =>
+{
+    var today = new DateOnly(2026, 10, 15); var leap = TutorTeachingAnalytics.Build(s, new(2024, 1, 1), new(2024, 12, 31), today);
+    Check(leap.Days.Count == 366 && leap.Days.Any(d => d.Date == new DateOnly(2024, 2, 29)) && leap.Taught == 0 && leap.PeakMinutes == 0 && leap.Periods.Count == 12, "闰年或空数据有误");
+    Check(TutorTeachingAnalytics.Build(s, new(1901, 1, 1), new(1901, 1, 2), new(1901, 1, 1)).Days.Count == 2, "最早日期错误");
+    Check(TutorTeachingAnalytics.Build(s, new(2100, 12, 25), new(2100, 12, 31), new(2100, 12, 31)).Days.Count == 7, "最晚日期错误");
+    Reject(() => TutorTeachingAnalytics.Build(s, new(2024, 1, 1), new(2025, 1, 1), today));
+    Reject(() => TutorTeachingAnalytics.Build(s, today, today.AddDays(-1), today));
+    Reject(() => TutorTeachingAnalytics.Build(s, new(1900, 1, 1), today, today));
+    Reject(() => TutorTeachingAnalytics.Build(s, today, today, today, "missing"));
+});
+Test("反馈口径排除空白、内部备注、取消及未来授课", (s, store, a) =>
+{
+    var today = new DateOnly(2026, 10, 15);
+    var partial = Lesson(a, today.AddDays(-2)); partial.Methods = "一种有效方法"; s.SaveLesson(partial);
+    var empty = Lesson(a, today.AddDays(-1)); empty.Content = "  "; empty.PrivateNotes = "仅自己看"; s.SaveLesson(empty);
+    var cancelled = Lesson(a, today); cancelled.Status = LessonStatus.Cancelled; s.SaveLesson(cancelled);
+    s.SaveLesson(Lesson(a, today.AddDays(1)));
+    var report = TutorTeachingAnalytics.Build(s, today.AddDays(-2), today.AddDays(1), today);
+    Check(report.Taught == 2 && report.WithFeedback == 1 && report.MissingFeedback.Single().Id == empty.Id, "反馈比例的分子或分母有误");
+    var future = TutorTeachingAnalytics.Build(s, today.AddDays(1), today.AddDays(3), today);
+    Check(future.Taught == 0 && future.WithFeedback == 0 && future.MissingFeedback.Count == 0 && future.FutureTaught == 1, "纯未来区间被当成实际授课");
+});
+Test("图表按日周月汇总并保留零值区间", (s, store, a) =>
+{
+    var today = new DateOnly(2026, 12, 31); s.SaveLesson(Lesson(a, new(2026, 12, 31)));
+    var daily = TutorTeachingAnalytics.Build(s, new(2026, 12, 18), today, today);
+    var weekly = TutorTeachingAnalytics.Build(s, new(2026, 12, 1), today, today);
+    var yearly = TutorTeachingAnalytics.Build(s, new(2026, 1, 1), today, today);
+    Check(daily.Periods.Count == 14 && weekly.Periods.Count == 5 && yearly.Periods.Count == 12, "日周月分组不正确");
+    Check(yearly.Periods.First().Total == 0 && yearly.Periods.Last().Taught == 1 && yearly.Periods.Sum(p => p.Taught) == 1 && weekly.Periods.First().From == new DateOnly(2026, 12, 1), "边界部分周或零值区间遗漏");
+});
+Test("课时排行保留十位以外的学生和全部分钟", (s, store, a) =>
+{
+    for (var i = 0; i < 12; i++) { var student = new TutorStudent { Name = "学生" + i, Subject = "数学" }; s.SaveStudent(student); var lesson = Lesson(student); lesson.Minutes = i + 1; s.SaveLesson(lesson); }
+    var report = TutorTeachingAnalytics.Build(s, new(2026, 10, 15), new(2026, 10, 15), new(2026, 10, 15));
+    Check(report.Students.Count == 12 && report.Students.Sum(r => r.Minutes) == 78 && report.NoTeaching.Single().Id == a.Id, "排行提前截断了统计数据");
+});
+
 Console.WriteLine($"Tutor core: {passed} passed, {failed} failed"); return failed == 0 ? 0 : 1;
 

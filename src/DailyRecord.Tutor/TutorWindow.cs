@@ -9,7 +9,7 @@ using Microsoft.Win32;
 
 namespace DailyRecord.App;
 
-public sealed class TutorWindow : Window
+public sealed partial class TutorWindow : Window
 {
     private readonly TutorService _service;
     private readonly TutorStore _store;
@@ -53,9 +53,9 @@ public sealed class TutorWindow : Window
         var sidebarGrid = new Grid { Margin = new Thickness(16, 22, 16, 18) }; sidebarGrid.RowDefinitions.Add(new RowDefinition()); sidebarGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var sidebar = Ui.Stack(new Image { Source = new System.Windows.Media.Imaging.BitmapImage(new Uri("pack://application:,,,/Assets/e2-day-logo.png")), Width = 56, Height = 56, HorizontalAlignment = HorizontalAlignment.Left },
             Ui.Text("E²-Day", 26, Ui.Accent, true), Ui.Text("家教版  /  TUTOR", 12, Ui.Amber, true), Ui.Text("记录每一堂课\n看见每一步成长", 12, Ui.Muted));
-        sidebar.Children[0].SetValue(MarginProperty, new Thickness(0, 0, 0, 12)); sidebar.Children[3].SetValue(MarginProperty, new Thickness(0, 12, 0, 28));
-        var labels = new[] { "◷  今日授课", "▦  授课日历", "♧  学生档案", "▥  收入统计", "≡  教学记录", "⚙  设置与备份" };
-        for (var i = 0; i < labels.Length; i++) { var destination = i; var b = Ui.Button(labels[i], () => Navigate(destination)); b.Tag = "nav:" + i; b.HorizontalContentAlignment = HorizontalAlignment.Left; b.Margin = new Thickness(0, 0, 0, 10); b.Padding = new Thickness(12); sidebar.Children.Add(b); _nav[i] = b; }
+        sidebar.Children[0].SetValue(MarginProperty, new Thickness(0, 0, 0, 12)); sidebar.Children[3].SetValue(MarginProperty, new Thickness(0, 10, 0, 20));
+        var labels = new[] { ("◷  今日授课", 0), ("▦  授课日历", 1), ("♧  学生档案", 2), ("▥  收入统计", 3), ("◈  教学概览", 6), ("≡  教学记录", 4), ("⚙  设置与备份", 5) };
+        for (var i = 0; i < labels.Length; i++) { var destination = labels[i].Item2; var b = Ui.Button(labels[i].Item1, () => Navigate(destination)); b.Tag = "nav:" + destination; b.HorizontalContentAlignment = HorizontalAlignment.Left; b.Margin = new Thickness(0, 0, 0, 8); b.Padding = new Thickness(10); sidebar.Children.Add(b); _nav[destination] = b; }
         sidebarGrid.Children.Add(sidebar);
         var footer = Ui.Stack(Ui.Text("●  独立本地记录", 11, Ui.Accent), _saved); Grid.SetRow(footer, 1); sidebarGrid.Children.Add(footer);
         var sidebarBorder = new Border { Background = (Brush)Application.Current.FindResource("SidebarBrush"), BorderBrush = (Brush)Application.Current.FindResource("SidebarLineBrush"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(24), Margin = new Thickness(14, 14, 0, 14), Child = sidebarGrid }; layout.Children.Add(sidebarBorder);
@@ -69,7 +69,7 @@ public sealed class TutorWindow : Window
         _timer.Tick += (_, _) => { if (last != Today) { last = Today; if (!OwnedWindows.Cast<Window>().Any()) Render(); } }; _timer.Start(); Closed += (_, _) => { _timer.Stop(); PageScroll.Dispose(); };
         Navigate(0);
     }
-    internal void Navigate(int page) { PageScroll.Stop(); _page = page; _scroller.ScrollToTop(); Render(); }
+    internal void Navigate(int page, bool keepRecordRange = false) { if (page == 4 && !keepRecordRange) { _recordFrom = null; _recordTo = null; } PageScroll.Stop(); _page = page; _scroller.ScrollToTop(); Render(); }
     internal void SelectDate(DateOnly date) { _month = new(date.Year, date.Month, 1); _selectedDate = date; _year = false; Navigate(1); }
     internal void SelectStudent(string id) { _student = id; Navigate(2); }
     internal void Run(Action action)
@@ -86,7 +86,7 @@ public sealed class TutorWindow : Window
         PageScroll.Stop();
         _body.Children.Clear(); _actions.Children.Clear(); _saved.Text = _service.SaveStatus;
         foreach (var pair in _nav) { pair.Value.Background = pair.Key == _page ? Ui.Selected : Brushes.Transparent; pair.Value.Foreground = pair.Key == _page ? Ui.Accent : Ui.Muted; }
-        switch (_page) { case 0: TodayPage(); break; case 1: CalendarPage(); break; case 2: StudentPage(); break; case 3: StatisticsPage(); break; case 4: RecordsPage(); break; default: SettingsPage(); break; }
+        switch (_page) { case 0: TodayPage(); break; case 1: CalendarPage(); break; case 2: StudentPage(); break; case 3: StatisticsPage(); break; case 4: RecordsPage(); break; case 6: DashboardPage(); break; default: SettingsPage(); break; }
     }
     private void AddLesson(DateOnly date, TutorLesson? lesson = null, bool complete = false)
     {
@@ -255,7 +255,15 @@ public sealed class TutorWindow : Window
         var search = new TextBox { Text = _search, Width = 290 }; var student = StudentFilter();
         var status = new ComboBox { ItemsSource = new[] { "全部记录", "待确认课程", "待填写反馈", "已授课", "已取消" }, SelectedIndex = _recordStatus, Padding = new Thickness(8), Width = 140 };
         _body.Children.Add(Ui.Row(search, student, status, Ui.Button("搜索", () => { _search = search.Text.Trim(); _filterStudent = string.IsNullOrEmpty(student.SelectedValue as string) ? null : student.SelectedValue as string; _recordStatus = status.SelectedIndex; Render(); }, true)));
-        IEnumerable<TutorLesson> records = _recordStatus == 1 ? _service.Lessons(new(1901, 1, 1), Today.AddDays(-1)).Where(l => l.Status == LessonStatus.Planned) : _service.State.Lessons;
+        if (_recordFrom is { } from && _recordTo is { } to)
+        {
+            var clear = Ui.Button($"{from:yyyy-MM-dd} 至 {to:yyyy-MM-dd} · 清除日期筛选", () => { _recordFrom = null; _recordTo = null; Render(); }, quiet: true); clear.Tag = "records-clear-range"; _body.Children.Add(clear);
+        }
+        var first = _recordFrom ?? new DateOnly(1901, 1, 1); var last = _recordTo ?? new DateOnly(2100, 12, 31);
+        var pendingEnd = DateOnly.FromDayNumber(Math.Min(last.DayNumber, Today.DayNumber - 1));
+        IEnumerable<TutorLesson> records = _recordStatus == 1
+            ? pendingEnd < first ? [] : _service.Lessons(first, pendingEnd).Where(l => l.Status == LessonStatus.Planned)
+            : _service.State.Lessons.Where(l => l.Date >= first && l.Date <= last);
         records = records.Where(l => (_filterStudent is null || l.StudentId == _filterStudent) && (_recordStatus switch { 2 => l.Status == LessonStatus.Taught && !l.HasFeedback, 3 => l.Status == LessonStatus.Taught, 4 => l.Status == LessonStatus.Cancelled, _ => true }) &&
             (string.IsNullOrEmpty(_search) || string.Join("\n", StudentName(l.StudentId), l.Subject, l.Content, l.Progress, l.Problems, l.Methods, l.NextPlan, l.PrivateNotes).Contains(_search, StringComparison.OrdinalIgnoreCase)));
         var list = records.OrderByDescending(l => l.Date).ToList(); _body.Children.Add(Ui.Label($"找到 {list.Count} 条记录"));
@@ -277,7 +285,7 @@ public sealed class TutorWindow : Window
     private void RestoreBackup()
     {
         var picker = new OpenFileDialog { Filter = "家教版备份 (*.json)|*.json" }; if (picker.ShowDialog(this) != true) return;
-        Run(() => { var preview = TutorStore.ReadBackup(picker.FileName); if (MessageBox.Show(this, $"备份包含 {preview.State.Students.Count} 位学生、{preview.State.Lessons.Count} 条课程记录。\n恢复将替换当前账号记录，先保留一份当前备份。是否继续？", "恢复家教版备份", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes) { _service.Restore(picker.FileName); _student = null; } });
+        Run(() => { var preview = TutorStore.ReadBackup(picker.FileName); if (MessageBox.Show(this, $"备份包含 {preview.State.Students.Count} 位学生、{preview.State.Lessons.Count} 条课程记录。\n恢复将替换当前账号记录，先保留一份当前备份。是否继续？", "恢复家教版备份", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes) { _service.Restore(picker.FileName); _student = null; _dashboardStudent = null; } });
     }
 }
 
