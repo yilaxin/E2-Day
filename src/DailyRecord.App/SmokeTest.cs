@@ -59,6 +59,7 @@ internal static partial class SmokeTest
         Click(window, "viewed:" + reminder.Id);
         if (service.IsViewed(reminder, service.Today)) throw new InvalidOperationException("撤销查看未生效。");
 
+        await VerifyUnifiedScrolling(holidays, clock, outputDirectory);
         MeasureCalendarNavigation(window, outputDirectory);
         VerifyCalendarCache(window, service, clock, outputDirectory);
         VerifyMonthView(window, service, outputDirectory);

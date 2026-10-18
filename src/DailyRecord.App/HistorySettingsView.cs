@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using DailyRecord.Core;
 using Microsoft.Win32;
 using ActivityKind = DailyRecord.Core.ActivityKind;
@@ -16,6 +17,11 @@ public partial class MainWindow
         HeaderActions.Children.Add(Ui.Button("导出备份", ExportBackup));
         var date = new DatePicker { SelectedDate = _historyDate.ToDateTime(TimeOnly.MinValue), Width = 170,
             DisplayDateStart = new DateTime(1901, 1, 1), DisplayDateEnd = new DateTime(2100, 12, 31), Margin = new Thickness(0, 0, 10, 0) };
+        // A Calendar popup has no scrolling viewport of its own. Stop its bubbling
+        // wheel after Calendar handles it, before it reaches the page ScrollViewer.
+        var popupCalendarStyle = new Style(typeof(Calendar), date.CalendarStyle ?? Application.Current.TryFindResource(typeof(Calendar)) as Style);
+        popupCalendarStyle.Setters.Add(new EventSetter(Mouse.MouseWheelEvent, new MouseWheelEventHandler((_, e) => e.Handled = true)));
+        date.CalendarStyle = popupCalendarStyle;
         var search = new TextBox { Text = _search, ToolTip = "搜索所有日期的标题和备注", Margin = new Thickness(0, 0, 10, 0) };
         var archived = new CheckBox { Content = "含已取消", IsChecked = _includeArchived, VerticalAlignment = VerticalAlignment.Center };
         var controls = new Grid { Margin = new Thickness(0, 0, 0, 18) };
@@ -25,6 +31,7 @@ public partial class MainWindow
         var results = new StackPanel(); PageBody.Children.Add(results);
         void RenderResults()
         {
+            StopPageScrolling();
             results.Children.Clear();
             bool Matches(string title, string notes) => title.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase) || notes.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase);
             var searching = !string.IsNullOrWhiteSpace(_search);

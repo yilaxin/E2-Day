@@ -29,8 +29,8 @@ internal static partial class SmokeTest
         {
             await window.Dispatcher.InvokeAsync(() => window.UpdateLayout(), DispatcherPriority.ContextIdle);
             var watch = Stopwatch.StartNew();
-            while (window.AnalyticsScroll.IsAnimating && watch.ElapsedMilliseconds < 1800) await Task.Delay(16);
-            Check(!window.AnalyticsScroll.IsAnimating, "滚动动画未及时停止。");
+            while (window.PageScroll.IsAnimating && watch.ElapsedMilliseconds < 1800) await Task.Delay(16);
+            Check(!window.PageScroll.IsAnimating, "滚动动画未及时停止。");
             await window.Dispatcher.InvokeAsync(() => window.UpdateLayout(), DispatcherPriority.ContextIdle);
         }
         static void Check(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
@@ -50,8 +50,8 @@ internal static partial class SmokeTest
             try
             {
                 Wheel(heat, -120);
-                Check(window.AnalyticsScroll.IsAnimating && page.VerticalOffset == 150, "滚轮仍然直接跳到终点。");
-                var destination = window.AnalyticsScroll.TargetOffset;
+                Check(window.PageScroll.IsAnimating && page.VerticalOffset == 150, "滚轮仍然直接跳到终点。");
+                var destination = window.PageScroll.TargetOffset;
                 await Settle();
                 Check(offsets.Count >= 2 && offsets.Any(n => n > 150 && n < destination), "没有观察到中间滚动位置。");
                 Check(offsets.Zip(offsets.Skip(1)).All(p => p.First <= p.Second), "向下滚动出现回跳。");
@@ -62,17 +62,17 @@ internal static partial class SmokeTest
             page.ScrollToVerticalOffset(150); await Settle();
             for (var i = 0; i < 4; i++) { Wheel(heat, -120); await Task.Delay(12); }
             var accumulated = Math.Min(page.ScrollableHeight, 150 + 4 * ScrollMotion.WheelDistance(-120, SystemParameters.WheelScrollLines, page.ViewportHeight));
-            Check(Math.Abs(window.AnalyticsScroll.TargetOffset - accumulated) < .5, "连续输入丢失或重复累计。");
+            Check(Math.Abs(window.PageScroll.TargetOffset - accumulated) < .5, "连续输入丢失或重复累计。");
             await Settle(); Check(Math.Abs(page.VerticalOffset - accumulated) < .5, "连续滚动没有到达合并目标。");
             page.ScrollToVerticalOffset(150); await Settle(); Wheel(heat, -120); await Task.Delay(35); window.UpdateLayout();
             var reversal = page.VerticalOffset; Wheel(heat, 120);
-            Check(window.AnalyticsScroll.TargetOffset < reversal, "反向滚动仍追赶旧方向的目标。");
+            Check(window.PageScroll.TargetOffset < reversal, "反向滚动仍追赶旧方向的目标。");
             await Settle(); Check(page.VerticalOffset < reversal, "反向滚动没有立即改变方向。");
             Wheel(heat, -120); await Task.Delay(20); page.ScrollToVerticalOffset(80); await Settle();
             Check(Math.Abs(page.VerticalOffset - 80) < .5, "程序定位后动画把页面拉回旧位置。");
             Wheel(heat, -120);
             page.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left) { RoutedEvent = Mouse.PreviewMouseDownEvent });
-            Check(!window.AnalyticsScroll.IsAnimating, "鼠标操作没有停止剩余滚动。");
+            Check(!window.PageScroll.IsAnimating, "鼠标操作没有停止剩余滚动。");
             report.Add("PASS: merged continuous wheel input; immediate reversal; external offset and pointer input cancel animation.");
         }
         page.ScrollToVerticalOffset(150); await Settle();
@@ -141,12 +141,12 @@ internal static partial class SmokeTest
         if (SystemParameters.ClientAreaAnimation && SystemParameters.WheelScrollLines > 0)
         {
             Wheel(heat, -120); window.Navigate(PageKind.Today); await Settle(); await Task.Delay(100);
-            Check(!window.AnalyticsScroll.IsAnimating && page.VerticalOffset == 0, "离开数据概览后动画继续改变其它页面位置。");
+            Check(!window.PageScroll.IsAnimating && page.VerticalOffset == 0, "离开数据概览后动画继续改变其它页面位置。");
             window.Navigate(PageKind.Analytics); await Settle();
             if (layout == "wide")
             {
                 heat = Descendants(window).OfType<Button>().First(b => b.IsEnabled && b.Tag is string tag && tag.StartsWith("analytics-heat:"));
-                Wheel(heat, -120); window.Close(); Check(!window.AnalyticsScroll.IsAnimating, "关闭窗口后仍保留动画订阅。");
+                Wheel(heat, -120); window.Close(); Check(!window.PageScroll.IsAnimating, "关闭窗口后仍保留动画订阅。");
             }
         }
     }
@@ -172,7 +172,9 @@ internal static partial class SmokeTest
     {
         static void Check(bool ok, string message) { if (!ok) throw new InvalidOperationException(message); }
         static void Wheel(UIElement source) => source.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice, Environment.TickCount, -120) { RoutedEvent = Mouse.PreviewMouseWheelEvent });
-        var viewer = new ScrollViewer { Content = new Border { Height = 1800, Background = Brushes.White } };
+        var surface = new Border { Height = 1800, Background = Brushes.White };
+        var nested = new ScrollViewer { Content = surface, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        var viewer = new ScrollViewer { Content = nested };
         var host = new Window { Content = viewer, Width = 420, Height = 320, ShowInTaskbar = false };
         var animate = false; var enabled = true;
         using var scrolling = new SmoothWheelScroller(viewer, () => enabled, () => animate);
@@ -181,8 +183,9 @@ internal static partial class SmokeTest
         {
             host.Show(); await Layout();
             var direct = new MouseWheelEventArgs(Mouse.PrimaryDevice, Environment.TickCount, -120) { RoutedEvent = Mouse.PreviewMouseWheelEvent };
-            viewer.RaiseEvent(direct); Check(!direct.Handled && !scrolling.IsAnimating, "关闭系统动画时仍拦截原生滚动。");
-            direct.RoutedEvent = Mouse.MouseWheelEvent; viewer.RaiseEvent(direct); await Layout();
+            surface.RaiseEvent(direct); Check(!scrolling.IsAnimating, "关闭系统动画时仍启动平滑过渡。");
+            if (!direct.Handled) { direct.RoutedEvent = Mouse.MouseWheelEvent; surface.RaiseEvent(direct); }
+            await Layout();
             Check(SystemParameters.WheelScrollLines == 0 || viewer.VerticalOffset > 0, "关闭系统动画时无法直接滚动。");
             animate = true; Wheel(viewer);
             if (SystemParameters.WheelScrollLines != 0)

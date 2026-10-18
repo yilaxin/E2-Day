@@ -56,7 +56,16 @@ internal sealed class SmoothWheelScroller : IDisposable
     private void OnWheel(object sender, MouseWheelEventArgs e)
     {
         if (e.Handled || e.Delta == 0 || !_enabled() || !_viewer.IsVisible) return;
-        if (!_animationsEnabled()) { Stop(); return; }
+        // Popup events can bubble through their logical owner, but their visuals belong
+        // to a different window. Leave date/selection popups in control of their input.
+        if (!OwnsVisual(e.OriginalSource as DependencyObject)) return;
+        if (!_animationsEnabled())
+        {
+            Stop(); e.Handled = true;
+            // Keep native page scrolling even over nested input/horizontal viewers.
+            _viewer.RaiseEvent(new MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta) { RoutedEvent = Mouse.MouseWheelEvent });
+            return;
+        }
         e.Handled = true;
         if (!IsAnimating) _motion.Reset(_viewer.VerticalOffset);
         _motion.Add(ScrollMotion.WheelDistance(e.Delta, SystemParameters.WheelScrollLines, _viewer.ViewportHeight), _viewer.ScrollableHeight);
@@ -67,6 +76,21 @@ internal sealed class SmoothWheelScroller : IDisposable
         _renderTime = TimeSpan.MinValue;
         IsAnimating = true;
         CompositionTarget.Rendering += OnRendering;
+    }
+
+    private bool OwnsVisual(DependencyObject? source)
+    {
+        for (var node = source; node is not null;)
+        {
+            if (ReferenceEquals(node, _viewer)) return true;
+            node = node switch
+            {
+                Visual visual => VisualTreeHelper.GetParent(visual),
+                ContentElement content => ContentOperations.GetParent(content) ?? (content as FrameworkContentElement)?.Parent,
+                _ => null
+            };
+        }
+        return false;
     }
 
     private void OnRendering(object? sender, EventArgs e)

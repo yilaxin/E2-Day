@@ -19,8 +19,12 @@ public partial class MainWindow : Window
     private readonly HolidayService _holidays;
     private readonly bool _smoke;
     private readonly DispatcherTimer _dayTimer;
-    private readonly SmoothWheelScroller _analyticsScroll;
-    internal SmoothWheelScroller AnalyticsScroll => _analyticsScroll;
+    private readonly SmoothWheelScroller _pageScroll;
+    private readonly SmoothWheelScroller _calendarScroll;
+    private readonly SmoothWheelScroller _monthScroll;
+    internal SmoothWheelScroller PageScroll => _pageScroll;
+    internal SmoothWheelScroller CalendarScroll => _calendarScroll;
+    internal SmoothWheelScroller MonthScroll => _monthScroll;
     private readonly Dictionary<PageKind, Button> _nav = [];
     private readonly CancellationTokenSource _lifetime = new();
     private PageKind _page;
@@ -41,8 +45,11 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _service = service; _store = store; _holidays = holidays; _smoke = smoke;
-        _analyticsScroll = new SmoothWheelScroller(PageScroller,
-            () => _page == PageKind.Analytics && _analyticsHabitPicker?.IsDropDownOpen != true);
+        _pageScroll = new SmoothWheelScroller(PageScroller,
+            () => _page is PageKind.Today or PageKind.History ||
+                _page == PageKind.Analytics && _analyticsHabitPicker?.IsDropDownOpen != true);
+        _calendarScroll = new SmoothWheelScroller(CalendarScroller, () => _page == PageKind.Year && _selectedMonth is null);
+        _monthScroll = new SmoothWheelScroller(MonthScroller, () => _page == PageKind.Year && _selectedMonth is not null);
         _lastToday = service.Today; _historyDate = service.Today; _year = service.Today.Year;
         if (!smoke)
         {
@@ -72,7 +79,11 @@ public partial class MainWindow : Window
             }
         };
         _dayTimer.Start();
-        Closed += (_, _) => { _analyticsScroll.Dispose(); _dayTimer.Stop(); _lifetime.Cancel(); _service.Changed -= UpdateSaveStatus; };
+        Closed += (_, _) =>
+        {
+            _pageScroll.Dispose(); _calendarScroll.Dispose(); _monthScroll.Dispose();
+            _dayTimer.Stop(); _lifetime.Cancel(); _service.Changed -= UpdateSaveStatus;
+        };
         SizeChanged += (_, _) =>
         {
             var wide = ActualWidth >= 1240;
@@ -85,7 +96,7 @@ public partial class MainWindow : Window
 
     public void Navigate(PageKind page)
     {
-        _analyticsScroll.Stop();
+        StopPageScrolling();
         RememberDraft(); _page = page; _selectedMonth = null;
         if (page == PageKind.Year) CalendarScroller.ScrollToTop(); else PageScroller.ScrollToTop();
         RefreshPage();
@@ -97,7 +108,7 @@ public partial class MainWindow : Window
     }
     private void RefreshPage()
     {
-        _analyticsScroll.Stop();
+        StopPageScrolling();
         RememberDraft(); _quickInput = null; _quickImportant = null;
         PageBody.Children.Clear(); HeaderActions.Children.Clear();
         PageScroller.Visibility = _page == PageKind.Year ? Visibility.Collapsed : Visibility.Visible;
@@ -123,6 +134,10 @@ public partial class MainWindow : Window
     }
     private void Header(string eyebrow, string title, string subtitle)
     { PageEyebrow.Text = eyebrow; PageTitle.Text = title; PageSubtitle.Text = subtitle; }
+    private void StopPageScrolling()
+    {
+        _pageScroll.Stop(); _calendarScroll.Stop(); _monthScroll.Stop();
+    }
     private void UpdateSaveStatus()
     {
         SidebarDate.Text = _service.Today.ToString("yyyy 年 M 月 d 日");
