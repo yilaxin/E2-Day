@@ -39,12 +39,12 @@ Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese
 
 ## 下载与开始使用
 
-Windows 日常版：**2.1.4**，修复数据概览热力图与长期任务选择框的滚轮拦截，保留统计分享、粉紫玻璃主题和原有任务、日历、图文备注与文件交换。鸿蒙原生版仍为 0.1.1。下方提供对应 Windows 程序包。程序采用免安装、自包含的文件夹发布方式，下载包内已包含所需的 .NET 运行依赖。
+Windows 日常版：**2.1.5**，优化数据概览连续滚动，新增短缓动、连续输入合并与即时反向，保留统计分享、粉紫玻璃主题和原有任务、日历、图文备注与文件交换。鸿蒙原生版仍为 0.1.1。下方提供对应 Windows 程序包。程序采用免安装、自包含的文件夹发布方式，下载包内已包含所需的 .NET 运行依赖。
 
 | 你的电脑 | 下载文件 |
 | --- | --- |
-| Intel / AMD 处理器的 64 位 Windows 电脑 | [E2-Day-v2.1.4-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.4/E2-Day-v2.1.4-win-x64.zip) |
-| Snapdragon 等 ARM 处理器的 Windows ARM64 电脑 | [E2-Day-v2.1.4-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.4/E2-Day-v2.1.4-win-arm64.zip) |
+| Intel / AMD 处理器的 64 位 Windows 电脑 | [E2-Day-v2.1.5-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.5/E2-Day-v2.1.5-win-x64.zip) |
+| Snapdragon 等 ARM 处理器的 Windows ARM64 电脑 | [E2-Day-v2.1.5-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.5/E2-Day-v2.1.5-win-arm64.zip) |
 
 1. 在 Windows“设置 → 系统 → 关于 → 系统类型”中确认电脑架构，选择对应下载包。
 2. **完整解压**到一个固定文件夹，保留程序旁边的 DLL、图标和 `Data` 文件夹。
@@ -100,6 +100,8 @@ Windows 日常版：**2.1.4**，修复数据概览热力图与长期任务选择
 完成趋势和热力图按**实际完成日**归属，长期打卡按**原安排日**归属；看过提醒、取消与结束不等于完成，撤销完成后相应数据减少。未来提醒和过去遗漏的长期任务不会累积为逾期。当前积压不限时间，热力图年份和打卡月份单独切换，空白表示没有完成记录。
 
 ![数据概览完整示例](docs/images/analytics-full.png)
+
+**数据概览平滑滚动（2.1.5）**：连续滚动会合并为连贯的短过渡，反向立即响应、停下迅速收住；支持细小滚轮增量，尊重 Windows 动画与滚动设置，保留图表和粉紫玻璃风格。
 
 **数据概览滚轮修复（2.1.4）**：鼠标停在热力图或收起的长期任务选择框上，也能上下滚动整页；展开选择框后滚动选项列表，图表和玻璃风格保持原样。
 

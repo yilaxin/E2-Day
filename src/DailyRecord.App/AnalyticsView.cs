@@ -14,6 +14,7 @@ public partial class MainWindow
     private int? _analyticsYear;
     private DateOnly? _analyticsHabitMonth;
     private string? _analyticsHabitId;
+    private ComboBox? _analyticsHabitPicker;
     internal Action<Window>? AnalyticsDetailsPresenter { get; set; }
     private static readonly Brush[] HeatColors = [Ui.SubtleSurface, Heat("#DED4F0"), Heat("#BBA5DC"), Heat("#9373C4"), Heat("#67459E")];
     private static Brush Heat(string hex) { var brush = (SolidColorBrush)new BrushConverter().ConvertFromString(hex)!; brush.Freeze(); return brush; }
@@ -21,6 +22,7 @@ public partial class MainWindow
 
     private void BuildAnalytics()
     {
+        _analyticsHabitPicker = null;
         var today = _service.Today;
         _analyticsYear ??= today.Year; _analyticsHabitMonth ??= new DateOnly(today.Year, today.Month, 1);
         var data = new TaskAnalytics(_service.State, today);
@@ -211,6 +213,7 @@ public partial class MainWindow
         var choices = data.Habits.Select(h => new HabitChoice(h.Definition.Id, h.Definition.Title + (h.Ended ? " · 已结束" : h.Definition.StartDate > data.Today ? " · 尚未开始" : ""))).ToArray();
         var picker = new ComboBox { ItemsSource = choices, SelectedItem = choices.Single(c => c.Id == _analyticsHabitId), MinWidth = 180,
             MaxWidth = 480, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 12), Tag = "analytics-habit-picker" };
+        _analyticsHabitPicker = picker;
         picker.PreviewMouseWheel += (_, e) => { if (!picker.IsDropDownOpen) ForwardAnalyticsWheel(picker, e); };
         picker.SelectionChanged += (_, _) => { if (picker.SelectedItem is HabitChoice selected) { _analyticsHabitId = selected.Id; RefreshPage(); } };
         var calendar = new UniformGrid { Columns = 7 };

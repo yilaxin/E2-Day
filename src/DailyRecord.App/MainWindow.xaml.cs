@@ -19,6 +19,8 @@ public partial class MainWindow : Window
     private readonly HolidayService _holidays;
     private readonly bool _smoke;
     private readonly DispatcherTimer _dayTimer;
+    private readonly SmoothWheelScroller _analyticsScroll;
+    internal SmoothWheelScroller AnalyticsScroll => _analyticsScroll;
     private readonly Dictionary<PageKind, Button> _nav = [];
     private readonly CancellationTokenSource _lifetime = new();
     private PageKind _page;
@@ -39,6 +41,8 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _service = service; _store = store; _holidays = holidays; _smoke = smoke;
+        _analyticsScroll = new SmoothWheelScroller(PageScroller,
+            () => _page == PageKind.Analytics && _analyticsHabitPicker?.IsDropDownOpen != true);
         _lastToday = service.Today; _historyDate = service.Today; _year = service.Today.Year;
         if (!smoke)
         {
@@ -68,7 +72,7 @@ public partial class MainWindow : Window
             }
         };
         _dayTimer.Start();
-        Closed += (_, _) => { _dayTimer.Stop(); _lifetime.Cancel(); _service.Changed -= UpdateSaveStatus; };
+        Closed += (_, _) => { _analyticsScroll.Dispose(); _dayTimer.Stop(); _lifetime.Cancel(); _service.Changed -= UpdateSaveStatus; };
         SizeChanged += (_, _) =>
         {
             var wide = ActualWidth >= 1240;
@@ -81,6 +85,7 @@ public partial class MainWindow : Window
 
     public void Navigate(PageKind page)
     {
+        _analyticsScroll.Stop();
         RememberDraft(); _page = page; _selectedMonth = null;
         if (page == PageKind.Year) CalendarScroller.ScrollToTop(); else PageScroller.ScrollToTop();
         RefreshPage();
@@ -92,6 +97,7 @@ public partial class MainWindow : Window
     }
     private void RefreshPage()
     {
+        _analyticsScroll.Stop();
         RememberDraft(); _quickInput = null; _quickImportant = null;
         PageBody.Children.Clear(); HeaderActions.Children.Clear();
         PageScroller.Visibility = _page == PageKind.Year ? Visibility.Collapsed : Visibility.Visible;
