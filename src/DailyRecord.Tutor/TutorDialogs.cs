@@ -48,11 +48,45 @@ internal sealed class TutorStudentDialog : TutorDialog
         var student = TutorRules.Copy(existing ?? new TutorStudent());
         var name = Field("姓名或昵称 *", student.Name, "student-name"); name.MaxLength = 80;
         var grade = Field("年级", student.Grade, "student-grade");
+        var school = Field("就读学校（选填）", student.School, "student-school");
+        var location = Field("授课地点（选填，如学生家、教室或线上）", student.TeachingLocation, "student-location");
         var subject = Field("默认科目", student.Subject, "student-subject");
         var rate = Field("默认时薪（元 / 小时）", student.HourlyRate.ToString("0.############################"), "student-rate");
-        var notes = Field("学习特点与长期目标", student.Notes, "student-notes", true);
         var archived = new CheckBox { Content = "已结课（历史课程与收入继续保留）", IsChecked = student.Archived, Margin = new Thickness(0, 18, 0, 12), Tag = "student-archived" }; Fields.Children.Add(archived);
-        Buttons(() => { student.Name = name.Text.Trim(); student.Grade = grade.Text.Trim(); student.Subject = subject.Text.Trim(); student.HourlyRate = Number(rate.Text, "时薪"); student.Notes = notes.Text; student.Archived = archived.IsChecked == true; service.SaveStudent(student); });
+        var learningStart = Fields.Children.Count;
+        Fields.Children.Add(Ui.Text("可按当前情况选择，作为备课参考；也可以先不选，以后再调整。", 12, Ui.Muted));
+        ComboBox Choice(string label, string tag, IReadOnlyList<string> options, string selected)
+        {
+            Fields.Children.Add(Ui.Label(label));
+            var box = new ComboBox { ItemsSource = new[] { "暂不选择" }.Concat(options).ToArray(), SelectedIndex = selected.Length == 0 ? 0 : options.ToList().IndexOf(selected) + 1, Tag = tag };
+            Fields.Children.Add(box); return box;
+        }
+        var level = Choice("基础水平（单选）", "student-level", TutorStudentProfile.Levels, student.LearningLevel);
+        var pace = Choice("学习节奏（单选）", "student-pace", TutorStudentProfile.Paces, student.LearningPace);
+        Fields.Children.Add(Ui.Label("辅导重点（可多选）"));
+        var focus = new WrapPanel();
+        foreach (var label in TutorStudentProfile.Focuses)
+            focus.Children.Add(new CheckBox { Content = label, Tag = "student-focus:" + label, IsChecked = student.LearningFocus.Contains(label), Margin = new Thickness(0, 5, 20, 10) });
+        Fields.Children.Add(focus);
+        var notes = Field("学习特点与长期目标（自由补充）", student.Notes, "student-notes", true);
+        notes.MinHeight = 130;
+        var basicFields = new StackPanel(); var learningFields = new StackPanel();
+        var children = Fields.Children.Cast<UIElement>().Skip(1).ToList();
+        foreach (var child in children) Fields.Children.Remove(child);
+        for (var i = 0; i < children.Count; i++) (i < learningStart - 1 ? basicFields : learningFields).Children.Add(children[i]);
+        var tabs = new TabControl { Tag = "student-tabs", Background = System.Windows.Media.Brushes.Transparent, BorderBrush = Ui.Line, Margin = new Thickness(0, 18, 0, 0) };
+        tabs.Items.Add(new TabItem { Header = "基本资料", Content = basicFields, Padding = new Thickness(16, 9, 16, 9) });
+        tabs.Items.Add(new TabItem { Header = "学习特点", Content = learningFields, Padding = new Thickness(16, 9, 16, 9) });
+        Fields.Children.Add(tabs);
+        Buttons(() =>
+        {
+            student.Name = name.Text.Trim(); student.Grade = grade.Text.Trim(); student.Subject = subject.Text.Trim(); student.HourlyRate = Number(rate.Text, "时薪");
+            student.School = school.Text.Trim(); student.TeachingLocation = location.Text.Trim();
+            student.LearningLevel = level.SelectedIndex <= 0 ? "" : (string)level.SelectedItem;
+            student.LearningPace = pace.SelectedIndex <= 0 ? "" : (string)pace.SelectedItem;
+            student.LearningFocus = focus.Children.OfType<CheckBox>().Where(c => c.IsChecked == true).Select(c => (string)c.Content).ToList();
+            student.Notes = notes.Text; student.Archived = archived.IsChecked == true; service.SaveStudent(student);
+        });
     }
 }
 

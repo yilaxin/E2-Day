@@ -11,10 +11,30 @@ public sealed class TutorStudent
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Name { get; set; } = "";
     public string Grade { get; set; } = "";
+    public string School { get; set; } = "";
+    public string TeachingLocation { get; set; } = "";
+    public string LearningLevel { get; set; } = "";
+    public string LearningPace { get; set; } = "";
+    public List<string> LearningFocus { get; set; } = [];
     public string Subject { get; set; } = "";
     public decimal HourlyRate { get; set; }
     public string Notes { get; set; } = "";
     public bool Archived { get; set; }
+}
+public static class TutorStudentProfile
+{
+    public static IReadOnlyList<string> Levels { get; } = Array.AsReadOnly(new[] { "需巩固", "中等", "良好", "优秀" });
+    public static IReadOnlyList<string> Paces { get; } = Array.AsReadOnly(new[] { "较慢 · 需要多练", "适中 · 稳步推进", "较快 · 理解较快" });
+    public static IReadOnlyList<string> Focuses { get; } = Array.AsReadOnly(new[] { "基础巩固", "查漏补缺", "同步提高", "拔高拓展", "考试冲刺", "习惯培养" });
+    public static IEnumerable<string> Labels(TutorStudent student)
+    {
+        if (student.LearningLevel.Length > 0) yield return "基础 · " + student.LearningLevel;
+        if (student.LearningPace.Length > 0) yield return "节奏 · " + student.LearningPace;
+        foreach (var focus in student.LearningFocus) yield return focus;
+    }
+    public static bool Matches(TutorStudent student, string query) => string.Join("\n",
+        new[] { student.Name, student.Grade, student.Subject, student.School, student.TeachingLocation }
+            .Concat(Labels(student))).Contains(query, StringComparison.OrdinalIgnoreCase);
 }
 public sealed class TutorLesson
 {
@@ -97,8 +117,13 @@ public static class TutorRules
         var students = state.Students.Select(s => s.Id).ToHashSet();
         static bool ValidRate(decimal rate) => rate is >= 0 and <= 1_000_000;
         foreach (var s in state.Students)
-            if (string.IsNullOrWhiteSpace(s.Name) || s.Name.Length > 80 || s.Grade is null || s.Subject is null || s.Notes is null || !ValidRate(s.HourlyRate))
-                throw new InvalidDataException("学生资料不完整，或时薪超出范围。");
+            if (string.IsNullOrWhiteSpace(s.Name) || s.Name.Length > 80 || s.Grade is null || s.Subject is null || s.Notes is null ||
+                s.School is null || s.School.Length > 200 || s.TeachingLocation is null || s.TeachingLocation.Length > 200 ||
+                s.LearningLevel is null || s.LearningLevel != "" && !TutorStudentProfile.Levels.Contains(s.LearningLevel) ||
+                s.LearningPace is null || s.LearningPace != "" && !TutorStudentProfile.Paces.Contains(s.LearningPace) ||
+                s.LearningFocus is null || s.LearningFocus.Count > TutorStudentProfile.Focuses.Count ||
+                s.LearningFocus.Any(f => !TutorStudentProfile.Focuses.Contains(f)) || s.LearningFocus.Distinct().Count() != s.LearningFocus.Count || !ValidRate(s.HourlyRate))
+                throw new InvalidDataException("学生资料不完整、学习选项无效，或学校／授课地点超过 200 字、时薪超出范围。");
         foreach (var l in state.Lessons)
         {
             if (!students.Contains(l.StudentId) || string.IsNullOrWhiteSpace(l.Subject) || !ValidDate(l.Date) || l.Minutes is < 1 or > 1440 || !ValidRate(l.HourlyRate) || !Enum.IsDefined(l.Status) ||

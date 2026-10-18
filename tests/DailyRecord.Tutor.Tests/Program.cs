@@ -45,5 +45,61 @@ Test("备份篡改与日常版格式拒绝，现有数据保留", (s, store, a) 
 Test("重启读取课程、反馈与待办", (s, store, a) => { s.SaveLesson(Lesson(a)); s.AddTodo("备课"); var id = s.State.Todos.Single().Id; s.ToggleTodo(id); using var reopened = new TutorStore(store.DirectoryPath); var next = new TutorService(reopened); Check(next.State.Lessons.Count == 1 && next.State.Todos.Single().Done, "重启丢失数据"); });
 Test("自动备份保留30份", (s, store, a) => { for (var i = 0; i < 35; i++) store.DailyBackup(s.State, new DateOnly(2025, 1, 1).AddDays(i)); Check(Directory.GetFiles(store.BackupDirectory, "????-??-??.json").Length == 30, "备份保留数错误"); });
 Test("日常版与家教版同目录也使用不同数据文件", (s, store, a) => { using var regular = new SqliteStore(store.DirectoryPath); Check(regular.Load().Tasks.Count == 0 && s.State.Students.Count == 1, "隔离错误"); });
+Test("学生学校地点和标签重启、备份与副本隔离", (s, store, a) =>
+{
+    a.School = "向阳中学（示例）"; a.TeachingLocation = "线上（示例）"; a.LearningLevel = "中等";
+    a.LearningPace = TutorStudentProfile.Paces[0]; a.LearningFocus = ["基础巩固", "查漏补缺"]; s.SaveStudent(a);
+    a.LearningFocus.Clear();
+    using var reopened = new TutorStore(store.DirectoryPath); var saved = reopened.Load().Students.Single();
+    Check(saved.School.Contains("向阳") && saved.TeachingLocation.Contains("线上") && saved.LearningFocus.Count == 2 && s.State.Students.Single().LearningFocus.Count == 2, "资料重启丢失或引用未隔离");
+    var path = Path.Combine(store.DirectoryPath, "profile.json"); store.Export(path, s.State);
+    using var targetStore = new TutorStore(Path.Combine(store.DirectoryPath, "profile-target")); var target = new TutorService(targetStore); target.Restore(path);
+    Check(JsonSerializer.Serialize(target.State.Students.Single()) == JsonSerializer.Serialize(saved), "新资料备份恢复不一致");
+});
+Test("旧版数据库及旧备份缺少新字段仍可打开", (s, store, a) =>
+{
+    a.Notes = "旧版长期备注"; s.SaveStudent(a);
+    var legacy = System.Text.Json.Nodes.JsonNode.Parse(JsonSerializer.Serialize(s.State))!;
+    foreach (var name in new[] { "School", "TeachingLocation", "LearningLevel", "LearningPace", "LearningFocus" })
+        legacy["Students"]![0]!.AsObject().Remove(name);
+    var payload = legacy.ToJsonString();
+    using (var db = new Microsoft.Data.Sqlite.SqliteConnection("Data Source=" + Path.Combine(store.DirectoryPath, "tutor.db")))
+    {
+        db.Open(); using var command = db.CreateCommand(); command.CommandText = "UPDATE tutor_state SET payload=$payload WHERE id=1";
+        command.Parameters.AddWithValue("$payload", payload); command.ExecuteNonQuery();
+    }
+    var next = new TutorService(store); var old = next.State.Students.Single();
+    Check(old.School == "" && old.TeachingLocation == "" && old.LearningLevel == "" && old.LearningPace == "" && old.LearningFocus.Count == 0 && old.Notes == a.Notes, "旧库缺省值或备注有误");
+    var backup = new TutorBackup { Payload = payload };
+    backup.Sha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(payload + "\n" + JsonSerializer.Serialize(backup.Images, StateJson.Options))));
+    var path = Path.Combine(store.DirectoryPath, "legacy.json"); File.WriteAllText(path, JsonSerializer.Serialize(backup)); next.Restore(path);
+    Check(next.State.Students.Single().Notes == "旧版长期备注" && next.State.Students.Single().LearningFocus.Count == 0, "旧备份恢复失败");
+});
+Test("无效学校地点或标签不改写学生资料", (s, store, a) =>
+{
+    var before = JsonSerializer.Serialize(s.State);
+    var changes = new Action<TutorStudent>[] { x => x.School = new string('学', 201), x => x.TeachingLocation = new string('地', 201), x => x.School = null!, x => x.LearningLevel = "不存在", x => x.LearningPace = "不存在", x => x.LearningFocus = ["不存在"], x => x.LearningFocus = ["基础巩固", "基础巩固"], x => x.LearningFocus = null!, x => x.LearningFocus = [null!] };
+    foreach (var change in changes) { var invalid = TutorRules.Copy(a); change(invalid); Reject(() => s.SaveStudent(invalid)); }
+    Check(JsonSerializer.Serialize(s.State) == before && JsonSerializer.Serialize(store.Load()) == before, "无效资料污染了内存或数据库");
+    a.School = new string('学', 200); a.TeachingLocation = new string('地', 200); s.SaveStudent(a);
+    Check(store.Load().Students.Single().School.Length == 200, "有效边界值被拒绝");
+});
+Test("清空学习选项保留原备注和历史课程", (s, store, a) =>
+{
+    s.SaveLesson(Lesson(a)); a.Notes = "保留原来的教学观察"; a.School = "示例学校"; a.LearningFocus = ["拔高拓展"]; a.LearningLevel = "优秀"; s.SaveStudent(a);
+    a.School = ""; a.TeachingLocation = ""; a.LearningFocus = []; a.LearningLevel = ""; a.LearningPace = ""; s.SaveStudent(a);
+    var saved = store.Load().Students.Single(); Check(saved.Notes == a.Notes && saved.School == "" && saved.LearningFocus.Count == 0 && s.Statistics(new(2026, 10, 15), new(2026, 10, 15)).Income == 225, "清空选项误删备注或改写历史收入");
+});
+Test("按学校地点或学习标签查找学生", (s, store, a) =>
+{
+    a.School = "向阳中学"; a.TeachingLocation = "Online Classroom"; a.LearningLevel = "中等"; a.LearningPace = TutorStudentProfile.Paces[0]; a.LearningFocus = ["拔高拓展"];
+    Check(new[] { "向阳", "online", "中等", "较慢", "拔高" }.All(q => TutorStudentProfile.Matches(a, q)) && !TutorStudentProfile.Matches(a, "无关搜索"), "资料搜索未覆盖新字段");
+});
+Test("家长反馈不附带学校地点与内部学习标签", (s, store, a) =>
+{
+    a.School = "内部学校标记"; a.TeachingLocation = "内部地址标记"; a.LearningLevel = "需巩固"; a.LearningFocus = ["习惯培养"]; s.SaveStudent(a);
+    var lesson = Lesson(a); lesson.Content = "本节练习内容"; var feedback = lesson.ParentFeedback(s.State.Students.Single().Name);
+    Check(feedback.Contains(lesson.Content) && !new[] { a.School, a.TeachingLocation, a.LearningLevel, a.LearningFocus[0] }.Any(feedback.Contains), "复制反馈带入了内部学生资料");
+});
 Console.WriteLine($"Tutor core: {passed} passed, {failed} failed"); return failed == 0 ? 0 : 1;
 

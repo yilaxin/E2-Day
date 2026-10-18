@@ -42,8 +42,15 @@ internal static partial class TutorSmoke
         var accountWindow = new AccountWindow(vault, true); Prepare(accountWindow); Text(accountWindow, "account-name", "示例老师");
         Find<PasswordBox>(accountWindow, "account-password").Password = "Tutor-Example-2026"; Find<PasswordBox>(accountWindow, "account-confirm").Password = "Tutor-Example-2026"; Click(accountWindow, "account-next"); Check(accountWindow.Session is not null, "家教版创建账号失败");
         var login = new AccountWindow(vault, true); Find<ComboBox>(login, "account-mode").SelectedIndex = 0; Text(login, "account-name", "示例老师"); Find<PasswordBox>(login, "account-password").Password = "Tutor-Example-2026"; Click(login, "account-next"); Check(login.Session?.AccountId == accountWindow.Session!.AccountId, "家教版登录失败");
-        var studentDialog = new TutorStudentDialog(service, testing: true); Text(studentDialog, "student-name", "小林（示例）"); Text(studentDialog, "student-grade", "初二"); Text(studentDialog, "student-subject", "数学"); Text(studentDialog, "student-rate", "150"); Text(studentDialog, "student-notes", "擅长直观理解，应用题需要多画图。目标：建立清晰的解题步骤。"); Click(studentDialog, "dialog-save"); Check(studentDialog.Saved, "学生编辑窗口保存失败");
+        var studentDialog = new TutorStudentDialog(service, testing: true); Text(studentDialog, "student-name", "小林（示例）"); Text(studentDialog, "student-grade", "初二"); Text(studentDialog, "student-subject", "数学"); Text(studentDialog, "student-rate", "150"); Text(studentDialog, "student-notes", "擅长直观理解，应用题需要多画图。目标：建立清晰的解题步骤。");
+        Text(studentDialog, "student-school", "向阳中学（示例）"); Text(studentDialog, "student-location", "线上授课（示例）");
+        Find<ComboBox>(studentDialog, "student-level").SelectedItem = "中等";
+        Find<ComboBox>(studentDialog, "student-pace").SelectedItem = TutorStudentProfile.Paces[0];
+        Find<CheckBox>(studentDialog, "student-focus:基础巩固").IsChecked = true;
+        Find<CheckBox>(studentDialog, "student-focus:查漏补缺").IsChecked = true;
+        Click(studentDialog, "dialog-save"); Check(studentDialog.Saved, "学生编辑窗口保存失败");
         var first = service.State.Students.Single();
+        VerifyStudentProfile(window, service, first, output);
         var invalid = new TutorStudentDialog(service, testing: true); Text(invalid, "student-name", "无效示例"); Text(invalid, "student-rate", "-1"); Click(invalid, "dialog-save"); Check(!invalid.Saved && service.State.Students.Count == 1, "无效时薪未被界面拒绝");
         var second = new TutorStudent { Name = "小周（示例）", Grade = "高一", Subject = "英语", HourlyRate = 160, Notes = "通过短文语境理解词汇，逐步提升阅读速度。" }; service.SaveStudent(second);
         var third = new TutorStudent { Name = "小陈（示例）", Grade = "小学五年级", Subject = "数学", HourlyRate = 120 }; service.SaveStudent(third);
@@ -88,7 +95,7 @@ internal static partial class TutorSmoke
         var before = service.State.Lessons.Count; var backup = Path.Combine(store.DirectoryPath, "ui-roundtrip.json"); store.Export(backup, service.State); service.Restore(backup); Check(service.State.Lessons.Count == before && store.Images(taught.ImageIds).Count == 1, "界面图文备份往返失败");
         window.Width = 1000; window.Height = 650; window.Navigate(0); Snapshot(window, Path.Combine(output, "tutor-compact.png")); Check(window.ActualWidth >= 0, "小窗口布局失败");
         await VerifyAppearanceAndScrolling(window, service, output);
-        var result = $"PASS Tutor WPF: {_checks} checks\nVersion: {Assembly.GetExecutingAssembly().GetName().Version}\nArchitecture: {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}\nIsolatedData: {store.DirectoryPath}\nStudents: {service.State.Students.Count}\nLessons: {service.State.Lessons.Count}\nScreenshots: 9\n"; File.WriteAllText(Path.Combine(output, "result.txt"), result);
+        var result = $"PASS Tutor WPF: {_checks} checks\nVersion: {Assembly.GetExecutingAssembly().GetName().Version}\nArchitecture: {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}\nIsolatedData: {store.DirectoryPath}\nStudents: {service.State.Students.Count}\nLessons: {service.State.Lessons.Count}\nScreenshots: 11\n"; File.WriteAllText(Path.Combine(output, "result.txt"), result);
         await Task.CompletedTask;
     }
 }

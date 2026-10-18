@@ -202,7 +202,7 @@ public sealed class TutorWindow : Window
         if (_student is { } id && _service.State.Students.FirstOrDefault(s => s.Id == id) is { } student)
         {
             _body.Children.Add(Ui.Row(Ui.Button("‹ 全部学生", () => { _student = null; Render(); }), Ui.Button("编辑资料", () => EditStudent(student)), Ui.Button("添加课程", () => AddLesson(Today, new TutorLesson { StudentId = student.Id, Date = Today, Subject = student.Subject, HourlyRate = student.HourlyRate }))));
-            _body.Children.Add(Ui.Card(Ui.Stack(Ui.Text(student.Name, 26, Ui.Accent, true), Ui.Text($"{student.Grade} · {student.Subject} · 默认 ¥{student.HourlyRate:0.##}/小时 · {(student.Archived ? "已结课" : "在教")}", 13, Ui.Muted), Ui.Label("学习特点与长期目标"), Ui.Text(string.IsNullOrWhiteSpace(student.Notes) ? "尚未填写" : student.Notes))));
+            _body.Children.Add(Ui.Card(Ui.Stack(Ui.Text(student.Name, 26, Ui.Accent, true), Ui.Text($"{student.Grade} · {student.Subject} · 默认 ¥{student.HourlyRate:0.##}/小时 · {(student.Archived ? "已结课" : "在教")}", 13, Ui.Muted), StudentProfileDetails(student), Ui.Label("学习特点与长期目标"), Ui.Text(string.IsNullOrWhiteSpace(student.Notes) ? "尚未填写" : student.Notes))));
             Summary(_service.Statistics(new(1901, 1, 1), new(2100, 12, 31), student.Id));
             _body.Children.Add(Ui.Label("未来 30 天课程"));
             foreach (var l in _service.Lessons(Today, Today.AddDays(30)).Where(l => l.StudentId == student.Id && l.Status == LessonStatus.Planned)) _body.Children.Add(LessonCard(l));
@@ -210,12 +210,22 @@ public sealed class TutorWindow : Window
             foreach (var l in _service.State.Lessons.Where(l => l.StudentId == student.Id && (l.Date < Today || l.Status != LessonStatus.Planned)).OrderByDescending(l => l.Date)) _body.Children.Add(LessonCard(l));
             return;
         }
-        var search = new TextBox { Text = _studentSearch, Width = 260 }; _body.Children.Add(Ui.Row(search, Ui.Button("搜索学生", () => { _studentSearch = search.Text.Trim(); Render(); })));
+        var search = new TextBox { Text = _studentSearch, Width = 260, Tag = "student-search", ToolTip = "搜索姓名、年级、科目、学校、授课地点或学习标签" }; _body.Children.Add(Ui.Row(search, Ui.Button("搜索学生", () => { _studentSearch = search.Text.Trim(); Render(); })));
         if (_service.State.Students.Count == 0) Empty("先添加第一位学生，设置默认科目与时薪，以后录课会自动填入。");
-        foreach (var s in _service.State.Students.Where(s => string.IsNullOrEmpty(_studentSearch) || (s.Name + s.Grade + s.Subject).Contains(_studentSearch, StringComparison.OrdinalIgnoreCase)).OrderBy(s => s.Archived).ThenBy(s => s.Name))
+        foreach (var s in _service.State.Students.Where(s => string.IsNullOrEmpty(_studentSearch) || TutorStudentProfile.Matches(s, _studentSearch)).OrderBy(s => s.Archived).ThenBy(s => s.Name))
         {
-            var panel = Ui.Stack(Ui.Text(s.Name, 20, Ui.Accent, true), Ui.Text($"{s.Grade} · {s.Subject} · ¥{s.HourlyRate:0.##}/小时 · {(s.Archived ? "已结课" : "在教")}", 12, Ui.Muted)); panel.Children.Add(Ui.Row(Ui.Button("查看档案", () => SelectStudent(s.Id)), Ui.Button("编辑", () => EditStudent(s)))); _body.Children.Add(Ui.Card(panel));
+            var panel = Ui.Stack(Ui.Text(s.Name, 20, Ui.Accent, true), Ui.Text($"{s.Grade} · {s.Subject} · ¥{s.HourlyRate:0.##}/小时 · {(s.Archived ? "已结课" : "在教")}", 12, Ui.Muted)); panel.Children.Add(StudentProfileDetails(s)); panel.Children.Add(Ui.Row(Ui.Button("查看档案", () => SelectStudent(s.Id)), Ui.Button("编辑", () => EditStudent(s)))); _body.Children.Add(Ui.Card(panel));
         }
+    }
+    private static StackPanel StudentProfileDetails(TutorStudent student)
+    {
+        var details = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+        if (!string.IsNullOrWhiteSpace(student.School)) details.Children.Add(Ui.Text("就读学校：" + student.School, 12, Ui.Muted));
+        if (!string.IsNullOrWhiteSpace(student.TeachingLocation)) details.Children.Add(Ui.Text("授课地点：" + student.TeachingLocation, 12, Ui.Muted));
+        var tags = new WrapPanel { Margin = new Thickness(0, 7, 0, 0) };
+        foreach (var label in TutorStudentProfile.Labels(student)) { var badge = Ui.Badge(label); ((TextBlock)badge.Child).FontSize = 12; badge.Padding = new Thickness(9, 4, 9, 4); badge.Margin = new Thickness(0, 0, 7, 7); tags.Children.Add(badge); }
+        if (tags.Children.Count > 0) details.Children.Add(tags);
+        return details;
     }
     private ComboBox StudentFilter()
     {
