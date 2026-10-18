@@ -93,9 +93,17 @@ internal static partial class SmokeTest
             var otherService = new TaskService(emptyStore, clock); var other = new MainWindow(otherService, emptyStore, holidays, smoke: true);
             other.Navigate(PageKind.Analytics); Prepare(other);
             Check(Descendants(other).OfType<TextBlock>().Single(t => Equals(t.Tag, "analytics-total")).Text == "0", "另一个账号显示了之前账号的统计。"); other.Close();
+            for (var i = 0; i < 20; i++) service.State.Events.Add(new EventDefinition { Title = $"滚动验证示例 {i + 1:00}", StartDate = today, Repeat = RepeatRule.Daily });
             var narrow = new MainWindow(service, store, holidays, smoke: true) { Width = 1100, Height = 760, ShowInTaskbar = false };
             narrow.Show(); narrow.Width = 1000; narrow.UpdateLayout(); narrow.Navigate(PageKind.Analytics);
-            Render((FrameworkElement)narrow.Content, 984, 720, Path.Combine(output, "analytics-narrow.png")); narrow.Close();
+            try
+            {
+                await VerifyAnalyticsScrolling(narrow, output, "narrow");
+                Render((FrameworkElement)narrow.Content, 984, 720, Path.Combine(output, "analytics-narrow.png"));
+                narrow.Width = 1400; narrow.Height = 940; narrow.UpdateLayout();
+                await VerifyAnalyticsScrolling(narrow, output, "wide");
+            }
+            finally { narrow.Close(); }
             File.WriteAllText(Path.Combine(output, "analytics-result.txt"), "PASS: empty/current-account-only data; four statistics; read-only navigation; 365/366 heat cells and future state; heat/trend/backlog/habit drill-downs; undo and completion update totals and lists; 7-day/monthly filters; year/month navigation; narrow real window layout.\n");
         }
         finally

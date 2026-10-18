@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using DailyRecord.Core;
 
@@ -193,6 +194,9 @@ public partial class MainWindow
         ((Button)navigation.Children[0]).Tag = "analytics-year-previous"; ((Button)navigation.Children[2]).Tag = "analytics-year-next";
         navigation.Children.Add(Ui.Button("今年", () => { _analyticsYear = data.Today.Year; RefreshPage(); }));
         var scroll = new ScrollViewer { Content = grid, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        // This viewer only owns horizontal overflow. Route vertical wheel input to the page
+        // before ScrollViewer's bubbling handler can swallow it over the date cells.
+        scroll.PreviewMouseWheel += ForwardAnalyticsWheel;
         return AnalyticsSection("完成热力图", $"全年完成 {counts.Values.Sum(d => d.Count)} 项 · {counts.Values.Count(d => d.Count > 0)} 天有完成记录", Ui.Stack(scroll, legend), navigation);
     }
 
@@ -207,6 +211,7 @@ public partial class MainWindow
         var choices = data.Habits.Select(h => new HabitChoice(h.Definition.Id, h.Definition.Title + (h.Ended ? " · 已结束" : h.Definition.StartDate > data.Today ? " · 尚未开始" : ""))).ToArray();
         var picker = new ComboBox { ItemsSource = choices, SelectedItem = choices.Single(c => c.Id == _analyticsHabitId), MinWidth = 180,
             MaxWidth = 480, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 12), Tag = "analytics-habit-picker" };
+        picker.PreviewMouseWheel += (_, e) => { if (!picker.IsDropDownOpen) ForwardAnalyticsWheel(picker, e); };
         picker.SelectionChanged += (_, _) => { if (picker.SelectedItem is HabitChoice selected) { _analyticsHabitId = selected.Id; RefreshPage(); } };
         var calendar = new UniformGrid { Columns = 7 };
         foreach (var weekday in new[] { "一", "二", "三", "四", "五", "六", "日" })
@@ -250,6 +255,18 @@ public partial class MainWindow
         ((FrameworkElement)nav.Children[1]).Margin = new Thickness(4, 0, 12, 0);
         nav.Children.Add(Ui.Button("本月", () => { _analyticsHabitMonth = new DateOnly(data.Today.Year, data.Today.Month, 1); RefreshPage(); }));
         return AnalyticsSection("长期任务打卡", "按原安排日记一次 · 补做不重复计天数 · 未记录留空", Ui.Stack(picker, columns), nav);
+    }
+
+    private void ForwardAnalyticsWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (e.Handled || e.Delta == 0) return;
+        e.Handled = true;
+        // Use the normal page ScrollViewer handler, preserving Windows wheel settings,
+        // direction and fractional deltas without refreshing or rebuilding the charts.
+        PageScroller.RaiseEvent(new MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta)
+        {
+            RoutedEvent = Mouse.MouseWheelEvent
+        });
     }
 
     private IReadOnlyList<TaskItem> HabitDayTasks(string eventId, DateOnly day)
