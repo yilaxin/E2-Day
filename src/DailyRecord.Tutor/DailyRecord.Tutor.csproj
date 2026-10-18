@@ -9,7 +9,7 @@
     <AssemblyTitle>E²-Day Teacher</AssemblyTitle>
     <Description>记录每一堂课，看见每一步成长</Description>
     <ApplicationIcon>Assets/e2-day-tutor.ico</ApplicationIcon>
-    <Version>1.1.0</Version>
+    <Version>1.1.1</Version>
     <PublishTrimmed>false</PublishTrimmed>
   </PropertyGroup>
   <ItemGroup>

@@ -93,10 +93,11 @@ internal static partial class TutorSmoke
         Check(Find<TextBox>(reused, "lesson-methods").Text.Contains("线段图") && string.IsNullOrEmpty(Find<TextBox>(reused, "lesson-progress").Text), "引用历史覆盖学生评价");
         var preview = NoteImages.CreatePreview(null, store.Images(taught.ImageIds).Single()); Prepare(preview); Check(preview.Content is not null, "图片预览失败");
         var before = service.State.Lessons.Count; var backup = Path.Combine(store.DirectoryPath, "ui-roundtrip.json"); store.Export(backup, service.State); service.Restore(backup); Check(service.State.Lessons.Count == before && store.Images(taught.ImageIds).Count == 1, "界面图文备份往返失败");
+        VerifyExamples(window, service, store, output);
         VerifyDashboard(window, service, store, output);
         window.Width = 1000; window.Height = 650; window.Navigate(0); Snapshot(window, Path.Combine(output, "tutor-compact.png")); Check(window.ActualWidth >= 0, "小窗口布局失败");
         await VerifyAppearanceAndScrolling(window, service, output);
-        var result = $"PASS Tutor WPF: {_checks} checks\nVersion: {Assembly.GetExecutingAssembly().GetName().Version}\nArchitecture: {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}\nIsolatedData: {store.DirectoryPath}\nStudents: {service.State.Students.Count}\nLessons: {service.State.Lessons.Count}\nScreenshots: 16\n"; File.WriteAllText(Path.Combine(output, "result.txt"), result);
+        var result = $"PASS Tutor WPF: {_checks} checks\nVersion: {Assembly.GetExecutingAssembly().GetName().Version}\nArchitecture: {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}\nIsolatedData: {store.DirectoryPath}\nStudents: {service.State.Students.Count}\nLessons: {service.State.Lessons.Count}\nScreenshots: 18\n"; File.WriteAllText(Path.Combine(output, "result.txt"), result);
         await Task.CompletedTask;
     }
 }

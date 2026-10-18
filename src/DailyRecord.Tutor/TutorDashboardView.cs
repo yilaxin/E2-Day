@@ -23,6 +23,7 @@ public sealed partial class TutorWindow
     private void DashboardPage()
     {
         Header("教学概览", "看见授课节奏、学生投入与课后跟进，把每一次记录用起来。");
+        if (!IsExample && _service.State.Students.Count == 0) _body.Children.Add(ExampleEntry());
         var from = _dashboardFrom ?? new DateOnly(Today.Year, Today.Month, 1);
         var to = _dashboardTo ?? Today;
         if (_dashboardStudent is not null && !_service.State.Students.Any(s => s.Id == _dashboardStudent)) _dashboardStudent = null;

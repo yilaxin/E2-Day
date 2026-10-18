@@ -42,9 +42,9 @@ public sealed partial class TutorWindow : Window
     internal TutorService Service => _service;
     internal Action<string> WriteClipboard { get; set; } = Clipboard.SetText;
 
-    public TutorWindow(TutorService service, TutorStore store, DateOnly? today = null)
+    public TutorWindow(TutorService service, TutorStore store, DateOnly? today = null, bool isExample = false)
     {
-        _service = service; _store = store; _fixedToday = today; _month = new(Today.Year, Today.Month, 1); _from = _month; _to = Today;
+        _service = service; _store = store; _fixedToday = today; IsExample = isExample; _month = new(Today.Year, Today.Month, 1); _from = _month; _to = Today;
         _holidays = new HolidayService(Path.Combine(AppContext.BaseDirectory, "Data", "Holidays"), Path.Combine(store.DirectoryPath, "Holidays"));
         Title = "E²-Day 家教版"; Width = Math.Min(1380, SystemParameters.WorkArea.Width - 32); Height = Math.Min(940, SystemParameters.WorkArea.Height - 32); MinWidth = 1000; MinHeight = 650;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
@@ -77,7 +77,7 @@ public sealed partial class TutorWindow : Window
         try { action(); Render(); }
         catch (Exception ex) { MessageBox.Show(this, ex.Message, "操作未完成", MessageBoxButton.OK, MessageBoxImage.Information); }
     }
-    private void Header(string title, string subtitle) { _title.Text = title; _subtitle.Text = subtitle; }
+    private void Header(string title, string subtitle) { _title.Text = IsExample ? title + " · 示例体验" : title; _subtitle.Text = subtitle; }
     private string StudentName(string id) => _service.State.Students.FirstOrDefault(s => s.Id == id)?.Name ?? "未知学生";
     private static string Hours(int minutes) => (minutes / 60m).ToString("0.##");
     private static string Status(TutorLesson l) => l.Status switch { LessonStatus.Taught => "已授课", LessonStatus.Cancelled => "已取消", _ => "待上课" };
@@ -86,6 +86,7 @@ public sealed partial class TutorWindow : Window
         PageScroll.Stop();
         _body.Children.Clear(); _actions.Children.Clear(); _saved.Text = _service.SaveStatus;
         foreach (var pair in _nav) { pair.Value.Background = pair.Key == _page ? Ui.Selected : Brushes.Transparent; pair.Value.Foreground = pair.Key == _page ? Ui.Accent : Ui.Muted; }
+        if (IsExample) _body.Children.Add(ExampleBanner());
         switch (_page) { case 0: TodayPage(); break; case 1: CalendarPage(); break; case 2: StudentPage(); break; case 3: StatisticsPage(); break; case 4: RecordsPage(); break; case 6: DashboardPage(); break; default: SettingsPage(); break; }
     }
     private void AddLesson(DateOnly date, TutorLesson? lesson = null, bool complete = false)
@@ -108,6 +109,7 @@ public sealed partial class TutorWindow : Window
     {
         Header("今日授课", $"{Today:yyyy 年 M 月 d 日 · dddd}  ·  { _holidays.ForDay(Today).Lunar}  ·  课后记录，随时回顾");
         _actions.Children.Add(Ui.Button("＋ 新增学生", () => EditStudent())); _actions.Children.Add(Ui.Button("＋ 添加课程", () => AddLesson(Today), true));
+        if (!IsExample && _service.State.Students.Count == 0) _body.Children.Add(ExampleEntry());
         var feedback = _service.State.Lessons.Where(l => l.Status == LessonStatus.Taught && !l.HasFeedback).OrderByDescending(l => l.Date).ToList();
         Summary(_service.Statistics(Today, Today), feedback.Count);
         _body.Children.Add(Ui.Label("今天的课程")); var lessons = _service.Lessons(Today, Today);
@@ -273,6 +275,12 @@ public sealed partial class TutorWindow : Window
     private void SettingsPage()
     {
         Header("设置与备份", $"E²-Day 家教版 {typeof(TutorWindow).Assembly.GetName().Version!.ToString(3)} · 记录保存在这台电脑上。");
+        if (IsExample)
+        {
+            _body.Children.Add(Ui.Card(Ui.Text("当前为临时示例体验，关闭后丢弃本次修改。请返回自己的记录进行账号管理、导出或恢复备份。", 14, Ui.Muted)));
+            return;
+        }
+        _body.Children.Add(ExampleEntry());
         _body.Children.Add(Ui.Card(Ui.Stack(Ui.Text("本机账号 · " + AccountName, 18, Ui.Accent, true), Ui.Text("每个账号拥有独立的学生与课程记录。", 13, Ui.Muted), Ui.Button("切换 / 管理账号登录", () => SwitchAccount?.Invoke()))));
         var panel = Ui.Stack(Ui.Text("保护你的教学记录", 20, Ui.Accent, true), Ui.Text("运行当天自动备份，保留最近 30 天；导出的家教版备份包含学生、课程、反馈、图片和待办。恢复会替换当前账号记录，恢复前会另存一份备份。", 13, Ui.Muted));
         panel.Children.Add(Ui.Row(Ui.Button("导出家教版备份", ExportBackup, true), Ui.Button("从备份恢复", RestoreBackup))); panel.Children.Add(Ui.Label("当前账号数据目录")); panel.Children.Add(Ui.Text(_store.DirectoryPath, 12, Ui.Muted));

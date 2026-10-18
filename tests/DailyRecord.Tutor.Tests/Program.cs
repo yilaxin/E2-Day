@@ -189,5 +189,38 @@ Test("课时排行保留十位以外的学生和全部分钟", (s, store, a) =>
     Check(report.Students.Count == 12 && report.Students.Sum(r => r.Minutes) == 78 && report.NoTeaching.Single().Id == a.Id, "排行提前截断了统计数据");
 });
 
+Test("示例数据覆盖三个月课时、反馈和学生学习特点", (s, store, a) =>
+{
+    var today = new DateOnly(2026, 10, 15); var state = TutorExamples.Create(today);
+    TutorRules.Validate(state); Check(state.Students.Count == 6 && state.Students.Count(x => !x.Archived) == 5, "示例学生数量有误");
+    Check(state.Students.All(x => x.Name.Contains("示例") && x.School.Contains("虚构")), "虚构资料缺少标识");
+    Check(state.Lessons.Count == 55 && state.Series.Count == 4 && state.Todos.Count == 3, "示例课程、排课或待办不完整");
+    Check(state.Lessons.Where(l => l.Status == LessonStatus.Taught).All(l => l.Date <= today) && state.Lessons.Where(l => l.Date == today).Any(l => l.Status == LessonStatus.Taught), "示例未来误计收入或今日无课");
+    using var sample = new TutorStore(Path.Combine(store.DirectoryPath, "sample")); sample.Save(state); var service = new TutorService(sample);
+    var report = TutorTeachingAnalytics.Build(service, today.AddDays(-89), today.AddDays(28), today);
+    Check(report.Taught == 50 && report.Pending.Count == 1 && report.Cancelled == 3 && report.MissingFeedback.Count == 4 && report.Planned > 0, "概览示例状态覆盖有误");
+    Check(service.Statistics(today.AddDays(-89), today).Income > 0 && service.Lessons(today.AddDays(1), today.AddDays(7)).Count == 4, "示例收入或下周排课为空");
+});
+Test("示例可重复生成但不污染原账号，跨日期自动平移", (s, store, a) =>
+{
+    s.SaveLesson(Lesson(a)); var before = JsonSerializer.Serialize(s.State); var disk = JsonSerializer.Serialize(store.Load());
+    var first = TutorExamples.Create(new(2026, 10, 15)); var again = TutorExamples.Create(new(2026, 10, 15));
+    Check(JsonSerializer.Serialize(first) == JsonSerializer.Serialize(again), "相同日期示例不稳定");
+    first.Students[0].Name = "被修改"; first.Students[0].LearningFocus.Clear();
+    Check(again.Students[0].Name != "被修改" && again.Students[0].LearningFocus.Count > 0, "示例共享可变引用");
+    var shifted = TutorExamples.Create(new(2026, 11, 15));
+    Check(shifted.Lessons.Zip(again.Lessons).All(p => p.First.Date.DayNumber - p.Second.Date.DayNumber == 31), "示例课程没有随当天平移");
+    Check(before == JsonSerializer.Serialize(s.State) && disk == JsonSerializer.Serialize(store.Load()), "生成示例更改了原账号");
+});
+Test("示例边界日期、备份往返与重复排课去重", (s, store, a) =>
+{
+    foreach (var date in new[] { new DateOnly(1901, 1, 1), new DateOnly(2100, 12, 31), new DateOnly(2028, 2, 29), new DateOnly(2027, 1, 1) }) TutorRules.Validate(TutorExamples.Create(date));
+    Reject(() => TutorExamples.Create(new(1900, 12, 31))); Reject(() => TutorExamples.Create(new(2101, 1, 1)));
+    var today = new DateOnly(2026, 10, 15); using var sample = new TutorStore(Path.Combine(store.DirectoryPath, "backup-sample")); sample.Save(TutorExamples.Create(today)); var service = new TutorService(sample);
+    var upcoming = service.Lessons(today.AddDays(1), today.AddDays(7)); var done = upcoming[0]; done.Status = LessonStatus.Taught; service.SaveLesson(done);
+    Check(service.Lessons(today.AddDays(1), today.AddDays(7)).Count == 4, "示例重复排课确认后重复计数");
+    var path = Path.Combine(sample.DirectoryPath, "example.json"); sample.Export(path, service.State); var restored = TutorStore.ReadBackup(path).State;
+    Check(JsonSerializer.Serialize(restored) == JsonSerializer.Serialize(service.State), "示例备份往返不一致");
+});
 Console.WriteLine($"Tutor core: {passed} passed, {failed} failed"); return failed == 0 ? 0 : 1;
 
