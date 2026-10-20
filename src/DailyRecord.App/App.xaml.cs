@@ -42,7 +42,7 @@ public partial class App : Application
             args.Handled = true;
         };
         StartupWindow? opening = null;
-        void DismissOpening() { var current = opening; opening = null; current?.Close(); }
+        MainWindow? window = null;
         try
         {
             Directory.CreateDirectory(_dataDirectory);
@@ -54,7 +54,9 @@ public partial class App : Application
             }
             if (!_smoke)
             {
-                opening = new StartupWindow();
+                window = new MainWindow();
+                MainWindow = window;
+                opening = new StartupWindow(window);
                 var animation = opening.PlayAsync();
                 var forceLogin = e.Args.Contains("--login");
                 var prepared = Task.Run(() =>
@@ -64,13 +66,12 @@ public partial class App : Application
                 });
                 var result = await animation;
                 var accountState = await prepared;
-                if (result == StartupResult.Closed) { Shutdown(); return; }
+                if (result == StartupResult.Closed || !window.IsVisible) { Shutdown(); return; }
                 _vault = accountState.Vault; _session = accountState.Session;
                 if (_session is null)
                 {
                     var login = new AccountWindow(_vault);
-                    login.Loaded += (_, _) => DismissOpening();
-                    if (login.ShowDialog() != true) { Shutdown(); return; }
+                    if (!await login.ShowInHostAsync(window)) { Shutdown(); return; }
                     _session = login.Session!;
                 }
             }
@@ -78,7 +79,12 @@ public partial class App : Application
             IClock clock = _smoke ? new PreviewClock() : new SystemClock();
             var service = new TaskService(_store, clock);
             var holidays = new HolidayService(Path.Combine(AppContext.BaseDirectory, "Data", "Holidays"), Path.Combine(_dataDirectory, "Holidays"));
-            var window = new MainWindow(service, _store, holidays, _smoke);
+            if (_smoke) window = new MainWindow(service, _store, holidays, true);
+            else
+            {
+                opening!.RestoreContent();
+                window!.InitializeData(service, _store, holidays);
+            }
             MainWindow = window;
             if (memoryOutput is not null)
             {
@@ -96,7 +102,6 @@ public partial class App : Application
                 window.ConfigureAccounts(_vault, account, SwitchAccount);
                 window.Closed += (_, _) => { if (!_switching) Shutdown(); };
                 window.Show();
-                DismissOpening();
             }
         }
         catch (Exception ex)
@@ -105,7 +110,7 @@ public partial class App : Application
             if (!_smoke) MessageBox.Show("无法打开 E²-Day。\n\n" + ex.Message + "\n\n数据目录：" + _dataDirectory, "启动失败", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
-        finally { DismissOpening(); }
+        finally { opening?.Dispose(); }
     }
     private void SwitchAccount()
     {

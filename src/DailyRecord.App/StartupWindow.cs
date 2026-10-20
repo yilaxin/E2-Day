@@ -12,9 +12,13 @@ namespace DailyRecord.App;
 
 internal enum StartupResult { Completed, Skipped, Closed }
 
-internal sealed class StartupWindow : Window
+// Controls an opening layer in the real main window; never creates a second HWND.
+internal sealed class StartupWindow : IDisposable
 {
-    internal const double DurationMilliseconds = 2200;
+    internal const double DurationMilliseconds = 3200;
+    internal const double LogoHoldMilliseconds = DurationMilliseconds * 1850 / 2200;
+    private readonly Window _host;
+    private object? _originalContent;
     private readonly TaskCompletionSource<StartupResult> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly DispatcherTimer _timer;
     private readonly Stopwatch _clock = new();
@@ -25,45 +29,63 @@ internal sealed class StartupWindow : Window
     internal int FrameCount { get; private set; }
     internal Task<StartupResult> Completion => _completion.Task;
 
-    internal StartupWindow(bool? reducedMotion = null)
+    internal StartupWindow(Window host, bool? reducedMotion = null)
     {
+        _host = host;
+        _originalContent = host.Content;
         _reducedMotion = reducedMotion ?? !SystemParameters.ClientAreaAnimation;
-        Title = "E²-Day · 探索每一天";
-        Width = 500; Height = 420; ResizeMode = ResizeMode.NoResize;
-        WindowStyle = WindowStyle.None; AllowsTransparency = true; Background = Brushes.Transparent;
-        WindowStartupLocation = WindowStartupLocation.CenterScreen;
-        ShowInTaskbar = false; UseLayoutRounding = true;
-        Content = new Border
-        {
-            CornerRadius = new CornerRadius(24), Background = Ui.Page,
-            BorderBrush = new SolidColorBrush(Color.FromArgb(239, 255, 255, 255)), BorderThickness = new Thickness(1), Child = Scene
-        };
-        AutomationProperties.SetName(this, "E²-Day 开场动画");
-        AutomationProperties.SetHelpText(this, "点击任意位置，或按 Esc、Enter、空格立即跳过。");
+        host.Title = "E²-Day · 探索每一天";
+        host.Content = new Border { Background = Ui.Page, Child = Scene };
+        AutomationProperties.SetName(Scene, "E²-Day 开场动画");
+        AutomationProperties.SetHelpText(Scene, "点击任意位置，或按 Esc、Enter、空格立即跳过。");
         _timer = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(16) };
         _timer.Tick += Tick;
-        ContentRendered += Start;
-        PreviewMouseDown += (_, e) => { e.Handled = true; Finish(StartupResult.Skipped); };
-        PreviewTouchDown += (_, e) => { e.Handled = true; Finish(StartupResult.Skipped); };
-        PreviewKeyDown += (_, e) =>
-        {
-            if (e.Key is Key.Escape or Key.Enter or Key.Space) { e.Handled = true; Finish(StartupResult.Skipped); }
-        };
-        Closed += (_, _) => Finish(StartupResult.Closed);
+        host.Loaded += Start;
+        host.PreviewMouseDown += SkipMouse;
+        host.PreviewTouchDown += SkipTouch;
+        host.PreviewKeyDown += SkipKey;
+        host.Closed += HostClosed;
     }
 
     internal Task<StartupResult> PlayAsync()
     {
-        Show();
+        _host.Show();
+        if (_host.IsLoaded && !_clock.IsRunning && !_finished) Start(_host, new RoutedEventArgs());
         return Completion;
     }
 
-    private void Start(object? sender, EventArgs e)
+    private void Start(object sender, RoutedEventArgs e)
     {
-        ContentRendered -= Start;
+        _host.Loaded -= Start;
         if (_finished) return;
-        Scene.SetFrame(_reducedMotion ? 1850 : 0);
-        _clock.Start(); _timer.Start(); Focus();
+        Scene.SetFrame(_reducedMotion ? LogoHoldMilliseconds : 0);
+        _clock.Start(); _timer.Start(); _host.Focus();
+    }
+
+    private void SkipMouse(object sender, MouseButtonEventArgs e) { e.Handled = true; Finish(StartupResult.Skipped); }
+    private void SkipTouch(object? sender, TouchEventArgs e) { e.Handled = true; Finish(StartupResult.Skipped); }
+    private void SkipKey(object sender, KeyEventArgs e)
+    {
+        if (e.Key is Key.Escape or Key.Enter or Key.Space) { e.Handled = true; Finish(StartupResult.Skipped); }
+    }
+    private void HostClosed(object? sender, EventArgs e) => Finish(StartupResult.Closed);
+    private void DetachInput()
+    {
+        _host.PreviewMouseDown -= SkipMouse; _host.PreviewTouchDown -= SkipTouch; _host.PreviewKeyDown -= SkipKey;
+        _host.Loaded -= Start; _host.Closed -= HostClosed;
+    }
+
+    internal void RestoreContent()
+    {
+        _host.Content = _originalContent;
+        _originalContent = null;
+        Dispose();
+    }
+    public void Dispose()
+    {
+        Finish(StartupResult.Closed);
+        DetachInput();
+        _originalContent = null;
     }
 
     private void Tick(object? sender, EventArgs e)
@@ -78,8 +100,8 @@ internal sealed class StartupWindow : Window
     {
         if (_finished) return;
         _finished = true;
-        _timer.Stop(); _timer.Tick -= Tick; _clock.Stop(); ContentRendered -= Start;
-        // The opaque opening surface remains above the next window until it is ready;
+        _timer.Stop(); _timer.Tick -= Tick; _clock.Stop(); DetachInput();
+        // The opaque opening surface remains until the next page is ready;
         // the click that skipped the opening never reaches a task or login button.
         Scene.ShowLoading();
         _completion.TrySetResult(result);
@@ -99,7 +121,7 @@ internal sealed class StartupScene : FrameworkElement
     private double _milliseconds;
     private bool _loading;
 
-    internal void SetFrame(double milliseconds) { _milliseconds = Math.Clamp(milliseconds, 0, 2200); _loading = false; InvalidateVisual(); }
+    internal void SetFrame(double milliseconds) { _milliseconds = Math.Clamp(milliseconds, 0, StartupWindow.DurationMilliseconds) * 2200 / StartupWindow.DurationMilliseconds; _loading = false; InvalidateVisual(); }
     internal void ShowLoading() { _loading = true; InvalidateVisual(); }
     private static T Freeze<T>(T value) where T : Freezable { value.Freeze(); return value; }
     private static Geometry Shape(string value) => Freeze(Geometry.Parse(value));
@@ -121,15 +143,17 @@ internal sealed class StartupScene : FrameworkElement
         base.OnRender(context);
         // Transparent paint supplies a hit target across the entire opening surface.
         context.DrawRectangle(Brushes.Transparent, null, new Rect(RenderSize));
-        var size = Math.Min(220, Math.Min(ActualWidth - 60, ActualHeight * .55));
+        var size = Math.Min(300, Math.Min(ActualWidth - 60, ActualHeight * .38));
         if (size <= 0) return;
         var x = (ActualWidth - size) / 2;
-        var y = 40.0;
+        var y = Math.Max(28, (ActualHeight - size - 120) / 2 - 12);
+        var titleY = y + size + 22;
+        var subtitleY = titleY + 44;
         if (_loading)
         {
             context.DrawImage(OriginalLogo, new Rect(x, y, size, size));
-            Text(context, "E²-Day", 27, 283, Ui.Ink, bold: true);
-            Text(context, "正在打开…", 14, 330, Ui.Muted);
+            Text(context, "E²-Day", 30, titleY, Ui.Ink, bold: true);
+            Text(context, "正在打开…", 15, subtitleY, Ui.Muted);
             return;
         }
         var fade = 1 - Phase(1950, 2200);
@@ -156,8 +180,8 @@ internal sealed class StartupScene : FrameworkElement
         // Settle into the actual approved logo, retaining its precise contour and texture.
         context.PushOpacity(settle); context.DrawImage(OriginalLogo, new Rect(0, 0, 1254, 1254)); context.Pop();
         context.Pop(); context.Pop();
-        Text(context, "E²-Day", 27, 283, Ui.Ink, Phase(1650, 1900), bold: true);
-        Text(context, "探索每一天", 15, 327, Ui.Muted, Phase(1650, 1900));
+        Text(context, "E²-Day", 30, titleY, Ui.Ink, Phase(1650, 1900), bold: true);
+        Text(context, "探索每一天", 16, subtitleY, Ui.Muted, Phase(1650, 1900));
         context.Pop();
         Text(context, "点击任意位置跳过", 12, ActualHeight - 35, Ui.Muted);
     }

@@ -14,11 +14,12 @@ public enum PageKind { Today, Year, History, Settings, Analytics }
 
 public partial class MainWindow : Window
 {
-    private readonly TaskService _service;
-    private readonly SqliteStore _store;
-    private readonly HolidayService _holidays;
+    private TaskService _service = null!;
+    private SqliteStore _store = null!;
+    private HolidayService _holidays = null!;
     private readonly bool _smoke;
-    private readonly DispatcherTimer _dayTimer;
+    private readonly DispatcherTimer _dayTimer = new() { Interval = TimeSpan.FromSeconds(20) };
+    private bool _initialized;
     private readonly SmoothWheelScroller _pageScroll;
     private readonly SmoothWheelScroller _calendarScroll;
     private readonly SmoothWheelScroller _monthScroll;
@@ -41,22 +42,49 @@ public partial class MainWindow : Window
     private string _search = "";
     private bool _includeArchived;
 
-    public MainWindow(TaskService service, SqliteStore store, HolidayService holidays, bool smoke = false)
+    internal MainWindow() : this(false) { }
+
+    private MainWindow(bool smoke)
     {
         InitializeComponent();
-        _service = service; _store = store; _holidays = holidays; _smoke = smoke;
+        _smoke = smoke;
         _pageScroll = new SmoothWheelScroller(PageScroller,
             () => _page is PageKind.Today or PageKind.History ||
                 _page == PageKind.Analytics && _analyticsHabitPicker?.IsDropDownOpen != true);
         _calendarScroll = new SmoothWheelScroller(CalendarScroller, () => _page == PageKind.Year && _selectedMonth is null);
         _monthScroll = new SmoothWheelScroller(MonthScroller, () => _page == PageKind.Year && _selectedMonth is not null);
-        _lastToday = service.Today; _historyDate = service.Today; _year = service.Today.Year;
         if (!smoke)
         {
             Width = Math.Max(MinWidth, Math.Min(1360, SystemParameters.WorkArea.Width - 36));
             Height = Math.Max(MinHeight, Math.Min(940, SystemParameters.WorkArea.Height - 48));
         }
         _wide = Width >= 1240;
+        Closed += (_, _) =>
+        {
+            _pageScroll.Dispose(); _calendarScroll.Dispose(); _monthScroll.Dispose();
+            _noteThumbnails.Clear(); _dayTimer.Stop(); _lifetime.Cancel();
+            if (_initialized) _service.Changed -= UpdateSaveStatus;
+        };
+        SizeChanged += (_, _) =>
+        {
+            var wide = ActualWidth >= 1240;
+            if (wide == _wide || !IsLoaded || !_initialized) return;
+            _wide = wide; RefreshPage();
+        };
+        Loaded += async (_, _) => { if (_initialized && !_smoke) await RefreshNewsAsync(false); };
+    }
+
+    public MainWindow(TaskService service, SqliteStore store, HolidayService holidays, bool smoke = false) : this(smoke)
+    {
+        InitializeData(service, store, holidays);
+    }
+
+    internal void InitializeData(TaskService service, SqliteStore store, HolidayService holidays)
+    {
+        if (_initialized) throw new InvalidOperationException("主窗口已经初始化。");
+        _service = service; _store = store; _holidays = holidays; _initialized = true;
+        _lastToday = service.Today; _historyDate = service.Today; _year = service.Today.Year;
+        _wide = (ActualWidth > 0 ? ActualWidth : Width) >= 1240;
         foreach (var pair in new[] { (PageKind.Today, "◷  今日清单"), (PageKind.Year, "▦  全年日历"),
                      (PageKind.Analytics, "▥  数据概览"), (PageKind.History, "≡  历史记录"), (PageKind.Settings, "⚙  偏好设置") })
         {
@@ -68,7 +96,6 @@ public partial class MainWindow : Window
             NavigationPanel.Children.Add(button); _nav[destination] = button;
         }
         _service.Changed += UpdateSaveStatus;
-        _dayTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(20) };
         _dayTimer.Tick += (_, _) =>
         {
             if (_service.Today != _lastToday)
@@ -79,20 +106,8 @@ public partial class MainWindow : Window
             }
         };
         _dayTimer.Start();
-        Closed += (_, _) =>
-        {
-            _pageScroll.Dispose(); _calendarScroll.Dispose(); _monthScroll.Dispose();
-            _noteThumbnails.Clear();
-            _dayTimer.Stop(); _lifetime.Cancel(); _service.Changed -= UpdateSaveStatus;
-        };
-        SizeChanged += (_, _) =>
-        {
-            var wide = ActualWidth >= 1240;
-            if (wide == _wide || !IsLoaded) return;
-            _wide = wide; RefreshPage();
-        };
         Navigate(PageKind.Today);
-        Loaded += async (_, _) => { if (!smoke) await RefreshNewsAsync(false); };
+        if (IsLoaded && !_smoke) _ = RefreshNewsAsync(false);
     }
 
     public void Navigate(PageKind page)

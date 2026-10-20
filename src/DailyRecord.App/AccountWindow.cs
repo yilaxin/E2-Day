@@ -10,6 +10,8 @@ namespace DailyRecord.App;
 internal sealed class AccountWindow : Window
 {
     public AccountSession? Session { get; private set; }
+    private Window? _host;
+    private event Action? Authenticated;
     public AccountWindow(AccountVault vault, bool smoke = false)
     {
         Title = "E²-Day · 账号登录"; Width = 500; Height = 690; MinWidth = 460; MinHeight = 620;
@@ -53,18 +55,18 @@ internal sealed class AccountWindow : Window
                         destination.Save(state, legacy.GetNoteImages(SyncMerge.ImageIds(state)));
                         destination.ExportBackup(Path.Combine(destination.BackupDirectory, "首次迁移.json"), state);
                     });
-                    account = created.Account; if (!smoke) ShowRecovery(this, account.Name, created.RecoveryCode);
+                    account = created.Account; if (!smoke) ShowRecovery(_host ?? this, account.Name, created.RecoveryCode);
                 }
                 else if (mode.SelectedIndex == 2)
                 {
                     if (password.Password != confirm.Password) throw new ArgumentException("两次输入的新密码不一致。");
                     account = vault.Accounts.FirstOrDefault(a => a.Name.Equals(name.Text.Trim(), StringComparison.OrdinalIgnoreCase)) ?? throw new UnauthorizedAccessException("账号或恢复码不正确。");
-                    var code = vault.ResetPassword(account.Id, password.Password, recovery.Text); if (!smoke) ShowRecovery(this, account.Name, code);
+                    var code = vault.ResetPassword(account.Id, password.Password, recovery.Text); if (!smoke) ShowRecovery(_host ?? this, account.Name, code);
                 }
                 else account = vault.Login(name.Text, password.Password);
                 Session = vault.Bind(account.Id, "这台电脑");
                 if (remember.IsChecked == true) RememberedLogin.Save(vault.Root, Session); else RememberedLogin.Clear(vault.Root);
-                if (!smoke) DialogResult = true;
+                if (!smoke) { if (_host is null) DialogResult = true; else Authenticated?.Invoke(); }
             }
             catch (Exception ex) { feedback.Text = ex is IOException ? "备份或账号保存未完成，原记录仍保留，请检查存储空间。" : ex.Message; }
         }, accent: true); next.Tag = "account-next"; next.Margin = new Thickness(0, 6, 0, 12); panel.Children.Add(next);
@@ -78,6 +80,28 @@ internal sealed class AccountWindow : Window
         }
         mode.SelectionChanged += (_, _) => Update(); Update();
     }
+    internal async Task<bool> ShowInHostAsync(Window host)
+    {
+        _host = host;
+        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        void Success() => completion.TrySetResult(true);
+        void Closed(object? sender, EventArgs e) => completion.TrySetResult(false);
+        Authenticated += Success; host.Closed += Closed;
+        var form = (UIElement)Content; Content = null;
+        host.Title = Title;
+        host.Content = new Grid
+        {
+            Background = Ui.Page,
+            Children = { new Border
+            {
+                Width = 500, MaxHeight = 690, Margin = new Thickness(24), HorizontalAlignment = HorizontalAlignment.Center,
+                CornerRadius = new CornerRadius(20), Background = Ui.Surface, Child = form
+            } }
+        };
+        try { return await completion.Task; }
+        finally { Authenticated -= Success; host.Closed -= Closed; _host = null; Close(); }
+    }
+
     internal static void ShowRecovery(Window owner, string name, string code)
     {
         var dialog = new Window { Title = "保存离线恢复码", Owner = owner, Width = 520, Height = 370, ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterOwner, Background = Ui.Page };
