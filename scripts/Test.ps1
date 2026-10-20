@@ -44,4 +44,5 @@ try {
         throw "桌面程序验证失败，退出代码 $($smokeProcess.ExitCode)。"
     }
     Get-Content -LiteralPath (Join-Path $previewDirectory 'result.txt') -Encoding UTF8
+    & (Join-Path $projectRoot 'tests/startup-entry-check.ps1') -Executable $executable -FixtureRoot (Join-Path $previewDirectory 'account-fixture')
 } finally { Pop-Location }

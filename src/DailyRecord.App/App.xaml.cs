@@ -41,6 +41,8 @@ public partial class App : Application
             MessageBox.Show("操作未完成，已保存的记录会保留。\n\n" + args.Exception.Message, "E²-Day", MessageBoxButton.OK, MessageBoxImage.Information);
             args.Handled = true;
         };
+        StartupWindow? opening = null;
+        void DismissOpening() { var current = opening; opening = null; current?.Close(); }
         try
         {
             Directory.CreateDirectory(_dataDirectory);
@@ -52,10 +54,25 @@ public partial class App : Application
             }
             if (!_smoke)
             {
-                _vault = new AccountVault(_dataDirectory);
-                _session = e.Args.Contains("--login") ? null : RememberedLogin.Load(_vault);
+                opening = new StartupWindow();
+                var animation = opening.PlayAsync();
+                var forceLogin = e.Args.Contains("--login");
+                var prepared = Task.Run(() =>
+                {
+                    var vault = new AccountVault(_dataDirectory);
+                    return (Vault: vault, Session: forceLogin ? null : RememberedLogin.Load(vault));
+                });
+                var result = await animation;
+                var accountState = await prepared;
+                if (result == StartupResult.Closed) { Shutdown(); return; }
+                _vault = accountState.Vault; _session = accountState.Session;
                 if (_session is null)
-                { var login = new AccountWindow(_vault); if (login.ShowDialog() != true) { Shutdown(); return; } _session = login.Session!; }
+                {
+                    var login = new AccountWindow(_vault);
+                    login.Loaded += (_, _) => DismissOpening();
+                    if (login.ShowDialog() != true) { Shutdown(); return; }
+                    _session = login.Session!;
+                }
             }
             _store = new SqliteStore(_smoke ? _dataDirectory : _vault!.DataDirectory(_session!.AccountId));
             IClock clock = _smoke ? new PreviewClock() : new SystemClock();
@@ -79,6 +96,7 @@ public partial class App : Application
                 window.ConfigureAccounts(_vault, account, SwitchAccount);
                 window.Closed += (_, _) => { if (!_switching) Shutdown(); };
                 window.Show();
+                DismissOpening();
             }
         }
         catch (Exception ex)
@@ -87,6 +105,7 @@ public partial class App : Application
             if (!_smoke) MessageBox.Show("无法打开 E²-Day。\n\n" + ex.Message + "\n\n数据目录：" + _dataDirectory, "启动失败", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
+        finally { DismissOpening(); }
     }
     private void SwitchAccount()
     {
