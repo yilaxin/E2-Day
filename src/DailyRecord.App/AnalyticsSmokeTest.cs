@@ -41,6 +41,7 @@ internal static partial class SmokeTest
                     OriginalScheduledDate = today.AddDays(-age), IsImportant = age == 8, CreatedAt = clock.Now });
             service.State.Tasks.Add(new TaskItem { Title = "未来提醒不计入积压", ScheduledDate = today.AddDays(4), OriginalScheduledDate = today.AddDays(4), CreatedAt = clock.Now });
             service.Save();
+            VerifyHeatmapRanges(window, service, store, output);
             var before = StateJson.Serialize(service.State); var revision = service.Revision;
             window.Navigate(PageKind.Analytics); Prepare(window);
             Check(before == StateJson.Serialize(service.State) && revision == service.Revision, "进入统计页面改动了记录。");

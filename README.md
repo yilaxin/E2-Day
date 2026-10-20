@@ -33,6 +33,10 @@ Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese
 
 **Windows 日常版 · 玻璃拟态界面**：粉紫柔光背景、半透明圆角卡片和蓝紫操作按钮，覆盖今日清单、全年／月历、历史、设置与编辑窗口。金色重要标记、完成淡化和原有记录继续保留。
 
+**热力图颜色范围（2.1.8）**：在“数据概览 → 完成热力图 → 颜色范围”设置前三档上限。支持实时图例、高完成量预设、恢复默认及按账号保存，复制统计图片同步使用设置。
+
+![自定义热力图示例](docs/images/heatmap-ranges-overview.png)
+
 **新增数据概览（Windows 2.1.2）**：完成热力图、完成趋势、待办积压和长期任务打卡，支持点击图表查看、处理事项，沿用粉紫玻璃风格。
 
 ![今日清单](docs/images/today.png)
@@ -41,12 +45,12 @@ Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese
 
 ## 下载与开始使用
 
-Windows 日常版：**2.1.7**，降低备注图片和玻璃卡片的内存占用，保留粉紫玻璃风格、统一平滑滚动、统计分享及原有任务、日历、图文备注与文件交换。鸿蒙原生版仍为 0.1.1。下方提供对应 Windows 程序包。程序采用免安装、自包含的文件夹发布方式，下载包内已包含所需的 .NET 运行依赖。
+Windows 日常版：**2.1.8**，新增自定义热力图颜色范围，页面图例与统计分享同步生效，保留粉紫玻璃风格、内存优化、统一平滑滚动及原有任务、日历和图文备注。鸿蒙原生版仍为 0.1.1。下方提供对应 Windows 程序包。程序采用免安装、自包含的文件夹发布方式，下载包内已包含所需的 .NET 运行依赖。
 
 | 你的电脑 | 下载文件 |
 | --- | --- |
-| Intel / AMD 处理器的 64 位 Windows 电脑 | [E2-Day-v2.1.7-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.7/E2-Day-v2.1.7-win-x64.zip) |
-| Snapdragon 等 ARM 处理器的 Windows ARM64 电脑 | [E2-Day-v2.1.7-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.7/E2-Day-v2.1.7-win-arm64.zip) |
+| Intel / AMD 处理器的 64 位 Windows 电脑 | [E2-Day-v2.1.8-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.8/E2-Day-v2.1.8-win-x64.zip) |
+| Snapdragon 等 ARM 处理器的 Windows ARM64 电脑 | [E2-Day-v2.1.8-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.8/E2-Day-v2.1.8-win-arm64.zip) |
 
 1. 在 Windows“设置 → 系统 → 关于 → 系统类型”中确认电脑架构，选择对应下载包。
 2. **完整解压**到一个固定文件夹，保留程序旁边的 DLL、图标和 `Data` 文件夹。

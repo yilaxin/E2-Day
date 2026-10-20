@@ -56,8 +56,9 @@ public partial class MainWindow
         return root;
     }
 
-    private static StackPanel ShareDayGrid(IReadOnlyList<CompletionDay> days, string tagPrefix, bool habit)
+    private StackPanel ShareDayGrid(IReadOnlyList<CompletionDay> days, string tagPrefix, bool habit)
     {
+        var scale = _service.State.Settings.CompletionHeatmapScale();
         var grid = new Grid(); var from = days[0].Day; var offset = ((int)from.DayOfWeek + 6) % 7;
         var compact = days.Count > 31;
         if (compact)
@@ -86,12 +87,12 @@ public partial class MainWindow
         foreach (var point in days)
         {
             var index = offset + point.Day.DayNumber - from.DayNumber;
-            var color = habit ? (point.Count > 0 ? HeatColors[3] : HeatColors[0]) : HeatColor(point.Count);
+            var color = habit ? (point.Count > 0 ? HeatColors[3] : HeatColors[0]) : HeatColor(point.Count, scale);
             var cell = new Border { Background = color, CornerRadius = new CornerRadius(4), Margin = new Thickness(2),
                 Tag = tagPrefix + point.Day.ToString("yyyy-MM-dd") };
             if (!compact)
             {
-                var foreground = point.Count >= 4 || habit && point.Count > 0 ? Brushes.White : Ui.Ink;
+                var foreground = (habit ? point.Count > 0 : scale.Level(point.Count) >= 3) ? Brushes.White : Ui.Ink;
                 var label = Ui.Text(point.Day.ToString("M/d"), 10, foreground);
                 var count = Ui.Text(habit ? point.Count > 0 ? "✓" : "—" : point.Count + " 项", 13, foreground, true);
                 var row = new Grid(); row.ColumnDefinitions.Add(new ColumnDefinition()); row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -100,11 +101,12 @@ public partial class MainWindow
             Grid.SetColumn(cell, compact ? 1 + index / 7 : index % 7); Grid.SetRow(cell, compact ? 1 + index % 7 : 1 + index / 7); grid.Children.Add(cell);
         }
         var legend = new WrapPanel { Margin = new Thickness(2, 10, 0, 0) };
-        foreach (var item in habit ? new[] { (0, "暂无完成记录"), (4, "已完成") } : new[] { (0, "0 项"), (1, "1 项"), (2, "2–3 项"), (4, "4–6 项"), (7, "7+ 项") })
+        foreach (var item in habit ? new[] { (0, "暂无完成记录"), (4, "已完成") } : scale.Bands())
         {
-            var swatch = new Border { Width = 12, Height = 12, Background = habit && item.Item1 > 0 ? HeatColors[3] : HeatColor(item.Item1),
+            var swatch = new Border { Width = 12, Height = 12, Background = habit && item.Item1 > 0 ? HeatColors[3] : HeatColor(item.Item1, scale),
                 CornerRadius = new CornerRadius(3), Margin = new Thickness(0, 0, 5, 0) };
-            var entry = Ui.Row(swatch, Ui.Text(item.Item2, 10, Ui.Muted)); entry.Margin = new Thickness(0, 0, 16, 0); legend.Children.Add(entry);
+            var label = Ui.Text(item.Item2, 10, Ui.Muted); label.Tag = tagPrefix + "legend:" + item.Item1;
+            var entry = Ui.Row(swatch, label); entry.Margin = new Thickness(0, 0, 16, 0); legend.Children.Add(entry);
         }
         return Ui.Stack(grid, legend);
     }

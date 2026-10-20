@@ -76,6 +76,10 @@ public sealed class UserSettings
     public int NormalDays { get; set; }
     public int ImportantDays { get; set; } = 3;
     public int VeryImportantDays { get; set; } = 7;
+    public int HeatmapLightMax { get; set; } = 1;
+    public int HeatmapMediumMax { get; set; } = 3;
+    public int HeatmapDarkMax { get; set; } = 6;
+    public HeatmapScale CompletionHeatmapScale() => new(HeatmapLightMax, HeatmapMediumMax, HeatmapDarkMax);
     public int LeadDays(EventImportance importance) => importance switch
     {
         EventImportance.Important => ImportantDays,
@@ -175,5 +179,7 @@ public static class StateJson
             throw new InvalidDataException("资讯缓存数据无效。");
         if (new[] { state.Settings.NormalDays, state.Settings.ImportantDays, state.Settings.VeryImportantDays }.Any(d => d is < 0 or > 365))
             throw new InvalidDataException("提醒天数必须在 0 到 365 之间。");
+        if (!state.Settings.CompletionHeatmapScale().IsValid)
+            throw new InvalidDataException(HeatmapScale.ValidationMessage);
     }
 }

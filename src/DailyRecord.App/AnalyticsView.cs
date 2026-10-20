@@ -18,7 +18,7 @@ public partial class MainWindow
     internal Action<Window>? AnalyticsDetailsPresenter { get; set; }
     private static readonly Brush[] HeatColors = [Ui.SubtleSurface, Heat("#DED4F0"), Heat("#BBA5DC"), Heat("#9373C4"), Heat("#67459E")];
     private static Brush Heat(string hex) { var brush = (SolidColorBrush)new BrushConverter().ConvertFromString(hex)!; brush.Freeze(); return brush; }
-    private static Brush HeatColor(int count) => HeatColors[count switch { <= 0 => 0, 1 => 1, <= 3 => 2, <= 6 => 3, _ => 4 }];
+    private static Brush HeatColor(int count, HeatmapScale scale) => HeatColors[scale.Level(count)];
 
     private void BuildAnalytics()
     {
@@ -156,6 +156,7 @@ public partial class MainWindow
 
     private Border BuildCompletionHeatmap(TaskAnalytics data)
     {
+        var scale = _service.State.Settings.CompletionHeatmapScale();
         var year = _analyticsYear!.Value; var first = new DateOnly(year, 1, 1); var last = new DateOnly(year, 12, 31);
         var counts = data.Daily(first, last).ToDictionary(d => d.Day); var offset = ((int)first.DayOfWeek + 6) % 7;
         var columns = (offset + last.DayNumber - first.DayNumber + 7) / 7;
@@ -175,7 +176,7 @@ public partial class MainWindow
         foreach (var point in counts.Values)
         {
             var day = point.Day; var index = offset + day.DayNumber - first.DayNumber;
-            var button = new Button { Style = (Style)Application.Current.FindResource("AnalyticsHeatCell"), Background = HeatColor(point.Count),
+            var button = new Button { Style = (Style)Application.Current.FindResource("AnalyticsHeatCell"), Background = HeatColor(point.Count, scale),
                 Margin = new Thickness(2), Tag = "analytics-heat:" + day.ToString("yyyy-MM-dd"), IsEnabled = day <= data.Today,
                 ToolTip = day > data.Today ? $"{day:yyyy/M/d} · 未来日期" : $"{day:yyyy/M/d} · 实际完成 {point.Count} 项；点击查看" };
             button.Click += (_, _) => ShowAnalyticsDetails($"{day:yyyy/M/d} · 完成事项",
@@ -185,16 +186,20 @@ public partial class MainWindow
             Grid.SetColumn(button, 1 + index / 7); Grid.SetRow(button, 1 + index % 7); grid.Children.Add(button);
         }
         var legend = new WrapPanel { Margin = new Thickness(24, 10, 0, 0) };
-        foreach (var pair in new[] { (0, "0 项"), (1, "1 项"), (2, "2–3 项"), (4, "4–6 项"), (7, "7+ 项") })
+        foreach (var pair in scale.Bands())
         {
-            var swatch = new Border { Width = 12, Height = 12, Background = HeatColor(pair.Item1), CornerRadius = new CornerRadius(3), Margin = new Thickness(0, 0, 5, 0) };
-            var item = Ui.Row(swatch, Ui.Text(pair.Item2, 10, Ui.Muted)); item.Margin = new Thickness(0, 0, 14, 0); legend.Children.Add(item);
+            var swatch = new Border { Width = 12, Height = 12, Background = HeatColor(pair.Item1, scale), CornerRadius = new CornerRadius(3), Margin = new Thickness(0, 0, 5, 0) };
+            var label = Ui.Text(pair.Item2, 10, Ui.Muted); label.Tag = "analytics-heat-legend:" + pair.Item1;
+            var item = Ui.Row(swatch, label); item.Margin = new Thickness(0, 0, 14, 0); legend.Children.Add(item);
         }
         var navigation = Ui.Row(Ui.Button("‹", () => { _analyticsYear--; RefreshPage(); }), Ui.Text(year + " 年", 12, bold: true), Ui.Button("›", () => { _analyticsYear++; RefreshPage(); }));
         ((Button)navigation.Children[0]).IsEnabled = year > 1901; ((Button)navigation.Children[2]).IsEnabled = year < 2100;
         ((FrameworkElement)navigation.Children[1]).Margin = new Thickness(4, 0, 12, 0);
         ((Button)navigation.Children[0]).Tag = "analytics-year-previous"; ((Button)navigation.Children[2]).Tag = "analytics-year-next";
         navigation.Children.Add(Ui.Button("今年", () => { _analyticsYear = data.Today.Year; RefreshPage(); }));
+        var ranges = Ui.Button("颜色范围", ShowHeatmapScaleEditor); ranges.Tag = "analytics-heat-ranges";
+        ranges.ToolTip = "自定义完成数量与颜色的对应范围，分享图片同步生效";
+        navigation.Children.Add(ranges);
         var scroll = new ScrollViewer { Content = grid, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled };
         // This viewer only owns horizontal overflow. Route vertical wheel input to the page
         // before ScrollViewer's bubbling handler can swallow it over the date cells.

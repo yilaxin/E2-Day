@@ -352,6 +352,16 @@ public sealed partial class TaskService
     public List<ActivityRecord> ActivitiesFor(DateOnly day) => State.Activities
         .Where(a => a.Day == day && !a.Reverted).OrderByDescending(a => a.At).ToList();
 
+    public void UpdateHeatmapScale(HeatmapScale scale)
+    {
+        ArgumentNullException.ThrowIfNull(scale);
+        if (!scale.IsValid) throw new ArgumentException(HeatmapScale.ValidationMessage);
+        State.Settings.HeatmapLightMax = scale.LightMax;
+        State.Settings.HeatmapMediumMax = scale.MediumMax;
+        State.Settings.HeatmapDarkMax = scale.DarkMax;
+        Save();
+    }
+
     public void UpdateSettings(int normal, int important, int veryImportant)
     {
         if (new[] { normal, important, veryImportant }.Any(d => d is < 0 or > 365))
