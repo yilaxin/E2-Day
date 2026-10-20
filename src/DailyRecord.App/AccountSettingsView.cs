@@ -19,7 +19,7 @@ public partial class MainWindow
         if (_account is null) return;
         var panel = Ui.Stack(Ui.Text("本机账号", 18, bold: true), Ui.Text("当前账号：" + _account.Name + " · 每个账号的记录独立保存。", 12, Ui.Muted));
         panel.Children.Add(Ui.Row(Ui.Button("锁定 / 切换账号", () => _switchAccount?.Invoke()), Ui.Button("重置密码", ResetAccountPassword)));
-        PageBody.Children.Add(Ui.Card(panel));
+        PageBody.Children.Add(GlassCardBorder.Create(panel));
     }
     private void ResetAccountPassword()
     {

@@ -80,7 +80,7 @@ public partial class MainWindow
         {
             var metric = numbers[i]; var value = Ui.Text(metric.Item2.ToString(), 29, i == 2 ? Ui.Amber : Ui.Accent, true);
             value.Tag = metric.Item4;
-            var card = Ui.Card(Ui.Stack(Ui.Text(metric.Item1, 12, Ui.Muted), value, Ui.Text(metric.Item3, 10, Ui.Muted)), new Thickness(17, 14, 17, 14));
+            var card = GlassCardBorder.Create(Ui.Stack(Ui.Text(metric.Item1, 12, Ui.Muted), value, Ui.Text(metric.Item3, 10, Ui.Muted)), new Thickness(17, 14, 17, 14));
             card.Margin = new Thickness(0, 0, i == 3 ? 0 : 12, 0); metrics.Children.Add(card);
         }
         return metrics;
@@ -92,7 +92,7 @@ public partial class MainWindow
         header.ColumnDefinitions.Add(new ColumnDefinition()); header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.Children.Add(Ui.Stack(Ui.Text(title, 17, bold: true), Ui.Text(subtitle, 11, Ui.Muted)));
         if (actions is not null) { Grid.SetColumn(actions, 1); header.Children.Add(actions); }
-        return Ui.Card(Ui.Stack(header, content), new Thickness(20));
+        return GlassCardBorder.Create(Ui.Stack(header, content), new Thickness(20));
     }
 
     private Border BuildCompletionTrend(TaskAnalytics data, DateOnly from, DateOnly to, bool sharing = false)
@@ -290,7 +290,7 @@ public partial class MainWindow
             root.Children.Clear(); root.Children.Add(Ui.Text(title, 23, bold: true));
             var description = Ui.Text(explanation, 12, Ui.Muted); description.Margin = new Thickness(0, 8, 0, 16); root.Children.Add(description);
             var tasks = query(); root.Children.Add(Ui.Label($"共 {tasks.Count} 项"));
-            if (tasks.Count == 0) root.Children.Add(Ui.Card(Ui.Text("这里暂时没有对应的事项。", 13, Ui.Muted)));
+            if (tasks.Count == 0) root.Children.Add(GlassCardBorder.Create(Ui.Text("这里暂时没有对应的事项。", 13, Ui.Muted)));
             foreach (var task in TaskService.Sort(tasks)) root.Children.Add(TaskRow(task, refresh: RenderDetails));
         }
         dialog.Content = new ScrollViewer { Content = root }; RenderDetails();

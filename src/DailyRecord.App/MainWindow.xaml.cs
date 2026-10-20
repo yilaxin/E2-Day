@@ -82,6 +82,7 @@ public partial class MainWindow : Window
         Closed += (_, _) =>
         {
             _pageScroll.Dispose(); _calendarScroll.Dispose(); _monthScroll.Dispose();
+            _noteThumbnails.Clear();
             _dayTimer.Stop(); _lifetime.Cancel(); _service.Changed -= UpdateSaveStatus;
         };
         SizeChanged += (_, _) =>
@@ -110,6 +111,7 @@ public partial class MainWindow : Window
     {
         StopPageScrolling();
         RememberDraft(); _quickInput = null; _quickImportant = null;
+        _analyticsHabitPicker = null;
         PageBody.Children.Clear(); HeaderActions.Children.Clear();
         PageScroller.Visibility = _page == PageKind.Year ? Visibility.Collapsed : Visibility.Visible;
         // Hidden keeps the year layout valid in its own viewport, without affecting other pages' scroll extent.
@@ -181,7 +183,7 @@ public partial class MainWindow : Window
         {
             var value = values[i];
             var caption = Ui.Stack(Ui.Text(value.Item2, 12, Ui.Muted), Ui.Text(value.Item1, 31, i == 2 ? Ui.Amber : Ui.Accent, bold: true), Ui.Text(value.Item3, 10, Ui.Muted));
-            var card = Ui.Card(caption, new Thickness(18, 15, 18, 14));
+            var card = GlassCardBorder.Create(caption, new Thickness(18, 15, 18, 14));
             card.Margin = new Thickness(0, 0, i < 2 ? 12 : 0, 0); Grid.SetColumn(card, i); stats.Children.Add(card);
         }
         PageBody.Children.Add(stats);
@@ -196,7 +198,7 @@ public partial class MainWindow : Window
         }
         var arrangement = Ui.Text(eventTitles.Count > 0 ? string.Join("  /  ", eventTitles) : "今天没有日历事件，可以留一点空间给自己。", 12, Ui.Muted);
         arrangement.Margin = new Thickness(0, 8, 0, 0); plan.Children.Add(arrangement);
-        left.Children.Add(Ui.Card(plan));
+        left.Children.Add(GlassCardBorder.Create(plan));
 
         _quickInput = new TextBox { Text = _quickDraft, ToolTip = "写下任务标题，按 Enter 添加", Margin = new Thickness(0, 0, 8, 0) };
         _quickInput.KeyDown += (_, e) => { if (e.Key == Key.Enter) { AddQuickTask(); e.Handled = true; } };
@@ -250,7 +252,7 @@ public partial class MainWindow : Window
             var placeholder = Ui.Text(empty, 12, Ui.Muted); placeholder.Margin = new Thickness(0, 12, 0, 12); panel.Children.Add(placeholder);
         }
         else foreach (var task in TaskService.Sort(list)) panel.Children.Add(TaskRow(task, dim: dim));
-        return Ui.Card(panel, new Thickness(17));
+        return GlassCardBorder.Create(panel, new Thickness(17));
     }
 
     private Border TaskRow(TaskItem task, bool dim = false, Action? refresh = null)
@@ -274,7 +276,7 @@ public partial class MainWindow : Window
         left.Children.Add(badges);
         if (!string.IsNullOrWhiteSpace(task.Notes))
         { var note = Ui.Text(task.Notes, 11, Ui.Muted); note.MaxHeight = 44; note.TextTrimming = TextTrimming.CharacterEllipsis; note.Margin = new Thickness(0, 6, 0, 0); left.Children.Add(note); }
-        if (task.ImageIds.Count > 0) left.Children.Add(NoteImages.Gallery(_service.GetNoteImages(task.ImageIds), this));
+        if (task.ImageIds.Count > 0) left.Children.Add(NoteGallery(task.ImageIds));
         content.Children.Add(left);
         var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Top };
         var star = Ui.Button(task.IsImportant ? "★" : "☆", () => Run(() => _service.ToggleImportant(task), refresh), quiet: true);
@@ -397,7 +399,7 @@ public partial class MainWindow : Window
             panel.Children.Add(new Border { Child = item, BorderBrush = Ui.Line, BorderThickness = new Thickness(0, 0, 0, 1), Padding = new Thickness(0, 10, 0, 12) });
         }
         panel.Children.Add(Ui.Text("最多 5 条 · 中文优先 · 保留来源", 9, Ui.Muted));
-        return Ui.Card(new Expander { Header = "关注 AI 的新进展", IsExpanded = true, Content = panel, FontSize = 11, Foreground = Ui.Muted }, new Thickness(17));
+        return GlassCardBorder.Create(new Expander { Header = "关注 AI 的新进展", IsExpanded = true, Content = panel, FontSize = 11, Foreground = Ui.Muted }, new Thickness(17));
     }
 
     private async Task RefreshNewsAsync(bool force)

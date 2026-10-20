@@ -26,11 +26,14 @@ public partial class App : Application
             return index >= 0 && index + 1 < e.Args.Length ? e.Args[index + 1] : null;
         }
         var smokeOutput = Argument("--smoke-test");
+        var memoryOutput = Argument("--memory-test");
+        if (memoryOutput is not null && Argument("--data-dir") is null) { Shutdown(1); return; }
         if (Argument("--generate-mobile-assets") is { } assets)
         { try { MobileAssets.Generate(assets); Shutdown(0); } catch { Shutdown(1); } return; }
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
-        _smoke = smokeOutput is not null;
+        _smoke = smokeOutput is not null || memoryOutput is not null;
         _dataDirectory = Argument("--data-dir") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DailyRecord");
+        if (memoryOutput is not null) _dataDirectory = Path.Combine(_dataDirectory, "memory-fixture-" + Guid.NewGuid().ToString("N"));
         DispatcherUnhandledException += (_, args) =>
         {
             LogError(args.Exception);
@@ -60,7 +63,12 @@ public partial class App : Application
             var holidays = new HolidayService(Path.Combine(AppContext.BaseDirectory, "Data", "Holidays"), Path.Combine(_dataDirectory, "Holidays"));
             var window = new MainWindow(service, _store, holidays, _smoke);
             MainWindow = window;
-            if (_smoke)
+            if (memoryOutput is not null)
+            {
+                await SmokeTest.MeasureMemory(window, service, (PreviewClock)clock, memoryOutput);
+                Shutdown(0);
+            }
+            else if (_smoke)
             {
                 await SmokeTest.Run(window, service, _store, holidays, (PreviewClock)clock, smokeOutput!);
                 Shutdown(0);

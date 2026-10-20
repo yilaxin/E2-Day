@@ -75,7 +75,7 @@ public partial class MainWindow
                 days.Children.Add(MonthDayButton(new(month.Year, month.Month, number)));
             }
             calendar.Children.Add(days);
-            var card = Ui.Card(calendar, new Thickness(12)); card.Margin = new Thickness(0); body.Children.Add(card);
+            var card = GlassCardBorder.Create(calendar, new Thickness(12)); card.Margin = new Thickness(0); body.Children.Add(card);
             MonthHost.Child = body;
         }
         RefreshMonthData();

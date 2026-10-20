@@ -100,7 +100,7 @@ public partial class MainWindow
             days.Children.Add(DayButton(date));
         }
         body.Children.Add(days);
-        var card = Ui.Card(body, new Thickness(11)); card.Margin = new Thickness(0, 0, 10, 12); return card;
+        var card = GlassCardBorder.Create(body, new Thickness(11)); card.Margin = new Thickness(0, 0, 10, 12); return card;
     }
 
     private Button DayButton(DateOnly date)
@@ -171,7 +171,7 @@ public partial class MainWindow
             var actions = Ui.Row(Ui.Button("＋ 安排事件", () => OpenEventEditor(date, Render)), Ui.Button("＋ 添加任务", () => OpenTaskEditor(date, Render), accent: true));
             actions.Margin = new Thickness(0, 0, 0, 18); root.Children.Add(actions);
             var tasks = _service.ForDate(date);
-            if (tasks.Count == 0) root.Children.Add(Ui.Card(Ui.Text("这一天还没有安排。", 13, Ui.Muted)));
+            if (tasks.Count == 0) root.Children.Add(GlassCardBorder.Create(Ui.Text("这一天还没有安排。", 13, Ui.Muted)));
             else foreach (var task in tasks) root.Children.Add(TaskRow(task, refresh: Render));
             var records = _service.ActivitiesFor(date);
             if (records.Count > 0)

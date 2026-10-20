@@ -14,6 +14,7 @@ internal static partial class SmokeTest
     public static async Task Run(MainWindow window, TaskService service, SqliteStore store, HolidayService holidays, PreviewClock clock, string outputDirectory)
     {
         Directory.CreateDirectory(outputDirectory);
+        await VerifyMemoryResources(window, service, outputDirectory);
         VerifyAccountFlow(outputDirectory);
         if (service.State.Tasks.Count == 0)
         {

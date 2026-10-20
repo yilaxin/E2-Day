@@ -44,7 +44,7 @@ public partial class MainWindow
             var completed = _service.State.Tasks.Count(t => t.State == TaskState.Completed && t.CompletedOn == _historyDate);
             var intro = Ui.Text(searching ? $"找到 {tasks.Count} 个事项、{records.Count} 条操作记录" : $"{_historyDate:yyyy 年 M 月 d 日} · 实际完成 {completed} 项", 15, bold: true);
             intro.Margin = new Thickness(0, 0, 0, 14); results.Children.Add(intro);
-            if (tasks.Count == 0) results.Children.Add(Ui.Card(Ui.Text(searching ? "没有匹配的事项，可以换一个关键词。" : "这一天没有个人事项记录。", 13, Ui.Muted)));
+            if (tasks.Count == 0) results.Children.Add(GlassCardBorder.Create(Ui.Text(searching ? "没有匹配的事项，可以换一个关键词。" : "这一天没有个人事项记录。", 13, Ui.Muted)));
             else foreach (var task in TaskService.Sort(tasks)) results.Children.Add(TaskRow(task, refresh: RenderResults));
             if (records.Count > 0)
             {
@@ -66,8 +66,8 @@ public partial class MainWindow
         var title = Ui.Text((record.IsImportant ? "★ " : "") + record.Title, 13, bold: record.IsImportant); title.Margin = new Thickness(0, 9, 0, 5);
         var panel = Ui.Stack(heading, title, Ui.Text($"当时原定日期：{record.ScheduledDate:yyyy-MM-dd}", 10, Ui.Muted));
         if (record.Notes.Length > 0) { var note = Ui.Text(record.Notes, 11, Ui.Muted); note.Margin = new Thickness(0, 6, 0, 0); panel.Children.Add(note); }
-        if (record.ImageIds.Count > 0) panel.Children.Add(NoteImages.Gallery(_service.GetNoteImages(record.ImageIds), this));
-        return Ui.Card(panel, new Thickness(16));
+        if (record.ImageIds.Count > 0) panel.Children.Add(NoteGallery(record.ImageIds));
+        return GlassCardBorder.Create(panel, new Thickness(16));
     }
 
     private void BuildSettings()
@@ -91,7 +91,7 @@ public partial class MainWindow
             _service.UpdateSettings(n, i, v);
         }), accent: true);
         save.HorizontalAlignment = HorizontalAlignment.Left; save.Margin = new Thickness(0, 18, 0, 0); reminder.Children.Add(save);
-        PageBody.Children.Add(Ui.Card(reminder));
+        PageBody.Children.Add(GlassCardBorder.Create(reminder));
 
         var data = Ui.Stack(Ui.Text("数据与备份", 18, bold: true), Ui.Text("自动保存；应用运行当天更新一份备份，保留最近 30 份。恢复前会备份当前记录。", 12, Ui.Muted));
         var path = Ui.Text(_smoke ? "示例数据目录（隔离）" : _store.DataDirectory, 11, Ui.Muted); path.Margin = new Thickness(0, 12, 0, 12); data.Children.Add(path);
@@ -101,7 +101,7 @@ public partial class MainWindow
             try { Process.Start(new ProcessStartInfo(_store.BackupDirectory) { UseShellExecute = true }); }
             catch (Exception ex) { MessageBox.Show(this, ex.Message, "无法打开文件夹"); }
         }));
-        data.Children.Add(actions); PageBody.Children.Add(Ui.Card(data));
+        data.Children.Add(actions); PageBody.Children.Add(GlassCardBorder.Create(data));
 
         var holiday = Ui.Stack(Ui.Text("中国大陆节假日", 18, bold: true),
             Ui.Text("法定放假与调休来自年度安排。尚未公布或未更新的年份会明确标示。", 12, Ui.Muted));
@@ -118,13 +118,13 @@ public partial class MainWindow
             finally { update.IsEnabled = true; }
         });
         var updateRow = Ui.Row(year, update); updateRow.Margin = new Thickness(0, 14, 0, 0); holiday.Children.Add(updateRow); holiday.Children.Add(feedback);
-        PageBody.Children.Add(Ui.Card(holiday));
+        PageBody.Children.Add(GlassCardBorder.Create(holiday));
 
         var news = Ui.Stack(Ui.Text("AI 资讯", 18, bold: true), Ui.Text("中文优先，英文补充；使用来源提供的标题与简介，不需要密钥或付费。", 12, Ui.Muted));
         foreach (var source in NewsService.Sources)
         { var label = Ui.Text($"{source.Name}  ·  {source.Language}", 11, Ui.Muted); label.Margin = new Thickness(0, 7, 0, 0); news.Children.Add(label); }
         var refresh = Ui.Button("刷新资讯", () => _ = RefreshNewsAsync(true)); refresh.HorizontalAlignment = HorizontalAlignment.Left;
-        refresh.Margin = new Thickness(0, 13, 0, 0); news.Children.Add(refresh); PageBody.Children.Add(Ui.Card(news));
+        refresh.Margin = new Thickness(0, 13, 0, 0); news.Children.Add(refresh); PageBody.Children.Add(GlassCardBorder.Create(news));
         var appVersion = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "2.1.0";
         PageBody.Children.Add(Ui.Text($"E²-Day {appVersion} · Explore Everyday Day · 探索每一天", 11, Ui.Muted));
     }

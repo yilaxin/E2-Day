@@ -20,7 +20,7 @@ public partial class MainWindow
         panel.Children.Add(new TextBox { Text = MobileAppUrl, IsReadOnly = true, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 8) });
         panel.Children.Add(Ui.Button("打开手机安装页面", () => Process.Start(new ProcessStartInfo(MobileAppUrl) { UseShellExecute = true }), quiet: true));
         panel.Children.Add(Ui.Text("用手机浏览器打开安装页面，添加到桌面后创建本机账号。记录保存在自己的设备上，交换文件包含记录与图片。", 12, Ui.Muted));
-        PageBody.Children.Add(Ui.Card(panel));
+        PageBody.Children.Add(GlassCardBorder.Create(panel));
     }
     private void ExportExchange()
     {
