@@ -39,6 +39,8 @@ Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese
 
 **新增数据概览（Windows 2.1.2）**：完成热力图、完成趋势、待办积压和长期任务打卡，支持点击图表查看、处理事项，沿用粉紫玻璃风格。
 
+**隐藏页面与旧内容回收（2.1.11）**：年／月布局短时复用，离开约 45 秒后空闲释放；切页和刷新时拆离旧内容与图片引用，保留硬件加速、原粉紫主题及平滑滚动。[内存与连续滚动对照](docs/MEMORY-v2.1.11.md)。
+
 **开场动画（Windows 2.1.10）**：先打开正常大小的主窗口，在窗口内播放约 3.2 秒的“向着朝阳出发”，道路延伸、朝阳升起并汇成 E²。从第一帧起点击任意位置即可跳过，也支持 Esc、Enter、空格；账号在后台同时读取，系统减少动画时显示短暂静态 logo。
 
 ![开场品牌定格（隔离预览）](docs/images/startup-opening.png)
@@ -49,12 +51,12 @@ Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese
 
 ## 下载与开始使用
 
-Windows 日常版：**2.1.10**，调整为大窗口内约 3.2 秒的品牌开场，动画、登录与今日清单共用同一窗口，保留内存优化、自定义热力图区间、主要页面的平滑滚动、统计分享、粉紫玻璃主题和原有任务、日历、图文备注与文件交换。鸿蒙原生版仍为 0.1.1。下方提供对应 Windows 程序包。程序采用免安装、自包含的文件夹发布方式，下载包内已包含所需的 .NET 运行依赖。
+Windows 日常版：**2.1.11**，改进隐藏年／月视图与旧页面内容的回收，保留原粉紫玻璃风格、硬件加速、统一平滑滚动、自定义热力图区间、统计分享、任务与图文备注，以及约 3.2 秒的大窗口开场。鸿蒙原生版仍为 0.1.1。下方提供对应 Windows 程序包。程序采用免安装、自包含的文件夹发布方式，下载包内已包含所需的 .NET 运行依赖。
 
 | 你的电脑 | 下载文件 |
 | --- | --- |
-| Intel / AMD 处理器的 64 位 Windows 电脑 | [E2-Day-v2.1.10-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.10/E2-Day-v2.1.10-win-x64.zip) |
-| Snapdragon 等 ARM 处理器的 Windows ARM64 电脑 | [E2-Day-v2.1.10-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.10/E2-Day-v2.1.10-win-arm64.zip) |
+| Intel / AMD 处理器的 64 位 Windows 电脑 | [E2-Day-v2.1.11-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.11/E2-Day-v2.1.11-win-x64.zip) |
+| Snapdragon 等 ARM 处理器的 Windows ARM64 电脑 | [E2-Day-v2.1.11-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.11/E2-Day-v2.1.11-win-arm64.zip) |
 
 1. 在 Windows“设置 → 系统 → 关于 → 系统类型”中确认电脑架构，选择对应下载包。
 2. **完整解压**到一个固定文件夹，保留程序旁边的 DLL、图标和 `Data` 文件夹。

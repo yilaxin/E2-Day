@@ -62,6 +62,7 @@ public partial class MainWindow : Window
         Closed += (_, _) =>
         {
             _pageScroll.Dispose(); _calendarScroll.Dispose(); _monthScroll.Dispose();
+            ReleasePageResources();
             _noteThumbnails.Clear(); _dayTimer.Stop(); _lifetime.Cancel();
             if (_initialized) _service.Changed -= UpdateSaveStatus;
         };
@@ -126,12 +127,11 @@ public partial class MainWindow : Window
     {
         StopPageScrolling();
         RememberDraft(); _quickInput = null; _quickImportant = null;
+        ReleasePageFocus();
         _analyticsHabitPicker = null;
-        PageBody.Children.Clear(); HeaderActions.Children.Clear();
+        ClearPageContent();
         PageScroller.Visibility = _page == PageKind.Year ? Visibility.Collapsed : Visibility.Visible;
-        // Hidden keeps the year layout valid in its own viewport, without affecting other pages' scroll extent.
-        CalendarScroller.Visibility = _page == PageKind.Year && _selectedMonth is null ? Visibility.Visible : Visibility.Hidden;
-        MonthScroller.Visibility = _page == PageKind.Year && _selectedMonth is not null ? Visibility.Visible : Visibility.Hidden;
+        UpdateCalendarHosts();
         foreach (var pair in _nav)
         {
             pair.Value.Background = pair.Key == _page ? Ui.Selected : Brushes.Transparent;
@@ -148,6 +148,7 @@ public partial class MainWindow : Window
             case PageKind.Settings: BuildSettings(); break;
             case PageKind.Analytics: BuildAnalytics(); break;
         }
+        ScheduleCalendarExpiry();
     }
     private void Header(string eyebrow, string title, string subtitle)
     { PageEyebrow.Text = eyebrow; PageTitle.Text = title; PageSubtitle.Text = subtitle; }

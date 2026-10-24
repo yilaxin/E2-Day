@@ -18,6 +18,9 @@ public partial class App : Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        // Theme brushes are immutable; freezing avoids per-owner change tracking across retired pages.
+        foreach (var resource in Resources.Values)
+            if (resource is System.Windows.Freezable { IsFrozen: false, CanFreeze: true } frozen) frozen.Freeze();
         CultureInfo.DefaultThreadCurrentCulture = CultureInfo.GetCultureInfo("zh-CN");
         CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.GetCultureInfo("zh-CN");
         string? Argument(string name)
@@ -32,6 +35,8 @@ public partial class App : Application
         { try { MobileAssets.Generate(assets); Shutdown(0); } catch { Shutdown(1); } return; }
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
         _smoke = smokeOutput is not null || memoryOutput is not null;
+        if (memoryOutput is not null && e.Args.Contains("--software-rendering"))
+            System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
         _dataDirectory = Argument("--data-dir") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DailyRecord");
         if (memoryOutput is not null) _dataDirectory = Path.Combine(_dataDirectory, "memory-fixture-" + Guid.NewGuid().ToString("N"));
         DispatcherUnhandledException += (_, args) =>

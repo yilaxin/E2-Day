@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Input;
 using System.Windows.Threading;
 using DailyRecord.Core;
 
@@ -25,29 +26,71 @@ internal static partial class SmokeTest
         service.Save();
         window.Width = 1400; window.Height = 940; window.ShowInTaskbar = false; window.Show();
         var rows = new List<object>();
-        async Task Record(string phase, PageKind page)
+        async Task Record(string phase, PageKind page, bool navigate = true, bool collect = true)
         {
-            var watch = Stopwatch.StartNew(); window.Navigate(page);
+            var watch = Stopwatch.StartNew(); if (navigate) window.Navigate(page);
             await window.Dispatcher.InvokeAsync(() => window.UpdateLayout(), DispatcherPriority.ContextIdle);
             var navigation = watch.Elapsed.TotalMilliseconds;
             // Collections are only for this isolated diagnostic, never normal app use.
-            GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
+            if (collect) { GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect(); }
             await Task.Delay(140);
             await window.Dispatcher.InvokeAsync(() => window.UpdateLayout(), DispatcherPriority.ContextIdle);
-            GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
+            if (collect) { GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect(); }
             using var process = Process.GetCurrentProcess(); process.Refresh();
             rows.Add(new { phase, page = page.ToString(), managedMiB = GC.GetTotalMemory(false) / 1048576d,
                 privateMiB = process.PrivateMemorySize64 / 1048576d, workingMiB = process.WorkingSet64 / 1048576d,
-                navigationMs = navigation, thumbnails = Descendants(window).OfType<Button>().Count(b => b.Tag is string s && s.StartsWith("note-image:")) });
+                navigationMs = navigation, thumbnails = Descendants(window).OfType<Button>().Count(b => b.Tag is string s && s.StartsWith("note-image:")),
+                attachedYearDays = Descendants(window).OfType<Button>().Count(b => b.Tag is string y && y.StartsWith("date:")),
+                attachedMonthDays = Descendants(window).OfType<Button>().Count(b => b.Tag is string m && m.StartsWith("month-date:")),
+                collected = collect });
         }
         foreach (var page in new[] { PageKind.Today, PageKind.Year, PageKind.Analytics, PageKind.History }) await Record("plain", page);
         var bytes = SeedMemoryImages(service, clock);
         foreach (var page in new[] { PageKind.Today, PageKind.History, PageKind.Analytics }) await Record("images", page);
         for (var round = 0; round < 3; round++)
             foreach (var page in new[] { PageKind.Today, PageKind.History, PageKind.Analytics, PageKind.Year }) await Record("cycle-" + round, page);
+        FindButton(window, $"month:{clock.Today:yyyy-MM}").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        await Record("month", PageKind.Year, navigate: false);
+        await Record("leave-calendar", PageKind.Today);
+        // Real 48-second inactivity: no production GC and no artificial cache-lifetime override.
+        await Task.Delay(TimeSpan.FromSeconds(48));
+        await Record("idle-48s", PageKind.Today, navigate: false, collect: false);
+        await Record("idle-collected", PageKind.Today, navigate: false);
+        await Record("return-after-idle", PageKind.Year);
+        var scrollFrames = new List<object>();
+        window.Height = 760;
+        foreach (var page in new[] { PageKind.Today, PageKind.Year, PageKind.Analytics, PageKind.History })
+        {
+            window.Navigate(page); await Task.Delay(180); window.UpdateLayout();
+            var viewer = (ScrollViewer)window.FindName(page == PageKind.Year ? "CalendarScroller" : "PageScroller");
+            var times = new List<double>(); TimeSpan last = TimeSpan.MinValue;
+            void Frame(object? sender, EventArgs args)
+            {
+                if (args is RenderingEventArgs render && render.RenderingTime != last)
+                { last = render.RenderingTime; times.Add(last.TotalMilliseconds); }
+            }
+            using var process = Process.GetCurrentProcess(); process.Refresh(); var cpu = process.TotalProcessorTime;
+            var watch = Stopwatch.StartNew(); CompositionTarget.Rendering += Frame;
+            try
+            {
+                for (var i = 0; i < 48; i++)
+                {
+                    viewer.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice, Environment.TickCount, i / 8 % 2 == 0 ? -30 : 30)
+                        { RoutedEvent = Mouse.PreviewMouseWheelEvent });
+                    await Task.Delay(25);
+                }
+            }
+            finally { CompositionTarget.Rendering -= Frame; }
+            process.Refresh(); var gaps = times.Zip(times.Skip(1), (a, b) => b - a).Order().ToArray();
+            scrollFrames.Add(new { page = page.ToString(), width = window.Width, height = window.Height, frames = times.Count,
+                medianGapMs = gaps.Length > 0 ? gaps[gaps.Length / 2] : 0,
+                p95GapMs = gaps.Length > 0 ? gaps[Math.Min(gaps.Length - 1, (int)(gaps.Length * .95))] : 0,
+                cpuMs = (process.TotalProcessorTime - cpu).TotalMilliseconds, durationMs = watch.Elapsed.TotalMilliseconds });
+        }
         var report = new { version = typeof(MainWindow).Assembly.GetName().Version?.ToString(),
             architecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
-            fixture = "24 completed tasks and 24 activity snapshots reuse one deterministic 1536x1024 PNG; separate fresh data directory; no system clipboard", imageBytes = bytes, samples = rows };
+            renderMode = RenderOptions.ProcessRenderMode.ToString(), renderingTier = RenderCapability.Tier >> 16,
+            fixture = "24 completed tasks and 24 activity snapshots reuse one deterministic 1536x1024 PNG; 1400x940 memory samples and 1400x760 scroll samples; separate fresh data directory; no system clipboard", imageBytes = bytes, samples = rows, scrollFrames };
         File.WriteAllText(Path.Combine(output, "memory-report.json"), JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
         window.Close();
     }

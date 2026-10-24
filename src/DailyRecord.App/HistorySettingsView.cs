@@ -32,7 +32,7 @@ public partial class MainWindow
         void RenderResults()
         {
             StopPageScrolling();
-            results.Children.Clear();
+            RetirePanelChildren(results);
             bool Matches(string title, string notes) => title.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase) || notes.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase);
             var searching = !string.IsNullOrWhiteSpace(_search);
             var tasks = searching ? _service.State.Tasks.Where(t => Matches(t.Title, t.Notes) ||
