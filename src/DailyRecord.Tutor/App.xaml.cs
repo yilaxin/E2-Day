@@ -12,6 +12,8 @@ public partial class App : Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        foreach (var resource in Resources.Values)
+            if (resource is System.Windows.Freezable { IsFrozen: false, CanFreeze: true } frozen) frozen.Freeze();
         System.Globalization.CultureInfo.DefaultThreadCurrentCulture = System.Globalization.CultureInfo.GetCultureInfo("zh-CN");
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
         string? Arg(string name) { var i = Array.IndexOf(e.Args, name); return i >= 0 && i + 1 < e.Args.Length ? e.Args[i + 1] : null; }
@@ -23,6 +25,7 @@ public partial class App : Application
             if (smoke is not null) Shutdown(1);
             else MessageBox.Show(args.Exception.Message, "操作未完成 · E²-Day 家教版");
         };
+        StartupWindow? opening = null; TutorWindow? window = null;
         try
         {
             Directory.CreateDirectory(_root);
@@ -31,12 +34,19 @@ public partial class App : Application
             AccountVault? vault = null; AccountSession? session = null;
             if (smoke is null)
             {
-                vault = new AccountVault(_root); session = e.Args.Contains("--login") ? null : RememberedLogin.Load(vault);
-                if (session is null) { var login = new AccountWindow(vault); if (login.ShowDialog() != true) { Shutdown(); return; } session = login.Session!; }
+                window = new TutorWindow(); MainWindow = window;
+                opening = new StartupWindow(window); var animation = opening.PlayAsync();
+                var forceLogin = e.Args.Contains("--login");
+                var prepared = Task.Run(() => { var v = new AccountVault(_root); return (Vault: v, Session: forceLogin ? null : RememberedLogin.Load(v)); });
+                var result = await animation; var accountState = await prepared;
+                if (result == StartupResult.Closed || !window.IsVisible) { Shutdown(); return; }
+                vault = accountState.Vault; session = accountState.Session;
+                if (session is null) { var login = new AccountWindow(vault); if (!await login.ShowInHostAsync(window)) { Shutdown(); return; } session = login.Session!; }
             }
             _store = new TutorStore(smoke is null ? vault!.DataDirectory(session!.AccountId) : _root);
             var service = new TutorService(_store);
-            var window = new TutorWindow(service, _store, smoke is not null ? new DateOnly(2026, 10, 15) : null);
+            if (smoke is not null) window = new TutorWindow(service, _store, new DateOnly(2026, 10, 15));
+            else { opening!.RestoreContent(); window!.InitializeData(service, _store); }
             MainWindow = window;
             if (smoke is not null) { await TutorSmoke.Run(window, service, _store, smoke); Shutdown(0); return; }
             var account = vault!.Accounts.Single(a => a.Id == session!.AccountId);
@@ -53,6 +63,7 @@ public partial class App : Application
             try { _store.DailyBackup(service.State, window.Today); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { window.BackupWarning = "自动备份未完成，请在设置中导出备份。"; }
         }
         catch (Exception ex) { Log(ex); if (smoke is null) MessageBox.Show(ex.Message + "\n数据目录：" + _root, "无法打开家教版"); Shutdown(1); }
+        finally { opening?.Dispose(); }
     }
     private void Log(Exception ex) { try { Directory.CreateDirectory(_root); File.AppendAllText(Path.Combine(_root, "errors.log"), DateTimeOffset.Now + " " + ex + "\n"); } catch (IOException) { } }
     protected override void OnExit(ExitEventArgs e) { _store?.Dispose(); _lock?.Dispose(); base.OnExit(e); }

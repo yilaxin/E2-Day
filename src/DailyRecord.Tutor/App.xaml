@@ -38,9 +38,7 @@
     <!-- Match the daily edition glass theme while keeping Teacher resources independent. -->
     <Style x:Key="GlassCard" TargetType="Border">
       <Setter Property="BorderBrush" Value="#F0FFFFFF" />
-      <Setter Property="Effect">
-        <Setter.Value><DropShadowEffect Color="#6B528E" BlurRadius="16" ShadowDepth="3" Opacity="0.075" /></Setter.Value>
-      </Setter>
+
     </Style>
     <Style x:Key="TeachingHeatCell" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
       <Setter Property="Template">

@@ -24,6 +24,9 @@ public sealed partial class TutorWindow
     {
         Header("教学概览", "看见授课节奏、学生投入与课后跟进，把每一次记录用起来。");
         if (!IsExample && _service.State.Students.Count == 0) _body.Children.Add(ExampleEntry());
+        var share = Ui.Button("复制为图片", () => { }); share.Tag = "dashboard-share";
+        share.Click += async (_, _) => await CopyDashboardImageAsync(share);
+        _actions.Children.Add(share);
         var from = _dashboardFrom ?? new DateOnly(Today.Year, Today.Month, 1);
         var to = _dashboardTo ?? Today;
         if (_dashboardStudent is not null && !_service.State.Students.Any(s => s.Id == _dashboardStudent)) _dashboardStudent = null;
@@ -112,6 +115,8 @@ public sealed partial class TutorWindow
     private Border DashboardHeatmap(TutorTeachingReport report)
     {
         var panel = Ui.Stack(Ui.Text("授课热力日历", 18, bold: true), Ui.Text("颜色越深，实际授课时长越多；点击日期查看课程。蓝色边框表示今天或未来有待上课安排。", 11, Ui.Muted));
+        var ranges = Ui.Button("颜色范围", ShowHeatmapScaleEditor); ranges.Tag = "dashboard-heat-ranges";
+        panel.Children.Add(ranges);
         var summary = Ui.Text($"授课 {report.TeachingDays} 天    单日最多 {Hours(report.PeakMinutes)} 小时    今天及未来待上课 {report.Planned} 节", 12, Ui.Accent);
         summary.Margin = new Thickness(0, 12, 0, 12); panel.Children.Add(summary);
         var monday = report.From.DayNumber - (((int)report.From.DayOfWeek + 6) % 7);
@@ -143,7 +148,7 @@ public sealed partial class TutorWindow
             foreach (var row in grid.RowDefinitions.Skip(1)) row.Height = new GridLength(Math.Max(5, Math.Min(18, (grid.Width - 25) / weeks)));
         };
         }
-        var colors = new[] { "#EEEAF4", "#E0D5F3", "#BAA5E3", "#9674CD", "#6352A6" }.Select(c => (Brush)new SolidColorBrush((Color)ColorConverter.ConvertFromString(c))).ToArray();
+        var colors = HeatColors; var scale = _service.State.HeatmapScale;
         var lastLabel = -4;
         foreach (var day in report.Days)
         {
@@ -152,7 +157,7 @@ public sealed partial class TutorWindow
             {
                 var label = Ui.Text(day.Date.ToString("M月"), 10, Ui.Muted); Grid.SetColumn(label, column); Grid.SetColumnSpan(label, Math.Min(size < 20 ? 3 : 2, weeks - column + 1)); grid.Children.Add(label); lastLabel = column;
             }
-            var level = day.Minutes == 0 ? 0 : day.Minutes <= 60 ? 1 : day.Minutes <= 120 ? 2 : day.Minutes <= 240 ? 3 : 4;
+            var level = scale.Level(day.Minutes);
             var button = Ui.Button("", () => SelectDate(day.Date)); button.Tag = "dashboard-day:" + day.Date.ToString("yyyy-MM-dd");
             button.Style = (Style)Application.Current.FindResource("TeachingHeatCell");
             button.Background = colors[level]; button.Padding = new Thickness(0); button.Margin = new Thickness(1);
@@ -169,7 +174,7 @@ public sealed partial class TutorWindow
         }
         panel.Children.Add(grid);
         var legend = new WrapPanel();
-        var labels = new[] { "无授课", "≤1小时", "≤2小时", "≤4小时", ">4小时" };
+        var labels = scale.Labels();
         for (var i = 0; i < colors.Length; i++) legend.Children.Add(Ui.Row(new Border { Width = 12, Height = 12, Background = colors[i], CornerRadius = new CornerRadius(3), Margin = new Thickness(0, 0, 5, 0) }, LegendText(labels[i])));
         panel.Children.Add(legend); return Ui.Card(panel);
     }

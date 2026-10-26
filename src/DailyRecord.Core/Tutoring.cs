@@ -86,6 +86,7 @@ public sealed class TutorState
     public List<TutorLesson> Lessons { get; set; } = [];
     public List<TutorSeries> Series { get; set; } = [];
     public List<TutorTodo> Todos { get; set; } = [];
+    public TutorHeatmapScale HeatmapScale { get; set; } = new();
 }
 public sealed class TutorBackup
 {
@@ -104,6 +105,7 @@ public static class TutorRules
     public static bool ValidDate(DateOnly date) => date >= new DateOnly(1901, 1, 1) && date <= new DateOnly(2100, 12, 31);
     public static void Validate(TutorState state)
     {
+        if (state.HeatmapScale is null || !state.HeatmapScale.IsValid) throw new InvalidDataException(TutorHeatmapScale.ValidationMessage);
         if (state.Version != 1 || state.Students is null || state.Lessons is null || state.Series is null || state.Todos is null)
             throw new InvalidDataException("家教版数据版本或结构无效。");
         static void Ids(IEnumerable<string?> ids)
@@ -246,6 +248,11 @@ public sealed class TutorService
         SaveStatus = "已保存 · " + DateTime.Now.ToString("HH:mm");
         try { _store.DailyBackup(State, DateOnly.FromDateTime(DateTime.Now)); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException) { SaveStatus += " · 自动备份未完成，请手动备份"; }
+    }
+    public void UpdateHeatmapScale(TutorHeatmapScale scale)
+    {
+        if (scale is null || !scale.IsValid) throw new ArgumentException(TutorHeatmapScale.ValidationMessage);
+        Change(s => s.HeatmapScale = scale);
     }
     public void SaveStudent(TutorStudent student) => Change(s => { s.Students.RemoveAll(x => x.Id == student.Id); s.Students.Add(TutorRules.Copy(student)); });
     public void SaveLesson(TutorLesson lesson, IEnumerable<NoteImage>? images = null) => Change(s => { s.Lessons.RemoveAll(l => l.Id == lesson.Id); s.Lessons.Add(TutorRules.Copy(lesson)); }, images);

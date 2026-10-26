@@ -86,8 +86,8 @@ def page(number, title, subtitle):
     para(subtitle, size=10.5, color=MUTED, gap=17)
     c.setStrokeColor(LINE); c.line(M, 47, W-M, 47)
     c.setFont('CN', 8); c.setFillColor(MUTED)
-    c.drawString(M, 31, f'适用家教版 {VERSION}  ·  2026-10-18')
-    c.drawRightString(W-M, 31, f'{number} / 9')
+    c.drawString(M, 31, f'适用家教版 {VERSION}  ·  2026-10-26')
+    c.drawRightString(W-M, 31, f'{number} / 10')
     c.bookmarkPage(f'page{number}')
     c.addOutlineEntry(title, f'page{number}', level=0)
 
@@ -103,10 +103,11 @@ link('下载 x64 版（普通 Intel / AMD 电脑）', f'{BASE}/E2-Day-Tutor-v{VE
 link('下载 ARM64 版（高通等 ARM 电脑）', f'{BASE}/E2-Day-Tutor-v{VERSION}-win-arm64.zip')
 section('03  完整解压，再打开程序')
 para('等待下载完成。右键 ZIP →「全部解压缩」，选择自己能写入的固定文件夹，例如“文档”中的 E2-Day-Tutor。进入解压后的文件夹，双击 <b>E2Day.Tutor.exe</b>。')
-box('保留旁边所有 DLL、Data、images 等文件。不要在 ZIP 压缩包里直接运行，也不要只把 exe 单独拷到桌面。桌面快捷方式的创建方法见第 8 页。', gold=True)
+box('保留旁边所有 DLL、Data、images 等文件。不要在 ZIP 压缩包里直接运行，也不要只把 exe 单独拷到桌面。桌面快捷方式的创建方法见第 9 页。', gold=True)
 para('同一文件夹内的“先读我.txt”和这份 PDF 可以离线阅读。遇到 Windows 安全提示，继续看下一页。', size=9.5, color=MUTED)
 
 page(2, '首次启动与本机账号', '遇到提示先看清文字，再决定下一步。')
+para('打开程序后，正常大小的窗口先播放约 3.2 秒开场，再进入登录或教学页面。点击任意位置，或按 Esc、Enter、空格即可跳过；系统减少动态效果时快速展示静态 logo。', size=10)
 section('出现“Windows 已保护你的电脑”')
 para('本版没有数字签名，下载次数也较少，可能触发 Windows 的应用信誉提醒。这类提醒本身不等于发现病毒；也不能据此认定文件安全。请先核对来源和文件。')
 box('仅在你确认来自 <b>github.com/yilaxin/E2-Day</b> 的家教版正式附件、文件名正确，并愿意信任该来源时：点击「更多信息」，核对应用名为 <b>E2Day.Tutor.exe</b>，再选择「仍要运行」。发布页提供 SHA256SUMS.txt，可供进一步核对。', gold=True)
@@ -166,7 +167,17 @@ box('<b>实际课时：</b>截至今天的已授课记录。<br/><b>待确认：
 section('课时分布与学习需求')
 para('课时排行包含已结课学生的历史记录，同名学生分开统计。当前学习需求使用在教学生现有的基础水平、学习节奏和辅导重点，与日期范围无关，不代表历史进步趋势；辅导重点可多选。查看图表与筛选不会修改教学记录。', size=10)
 
-page(8, '桌面入口、备份与换电脑', '用快捷方式打开，把备份保存在程序文件夹之外。')
+page(8, '颜色与图片，按你的需要调整', '教学概览新增颜色范围和匿名图片分享。')
+section('自定义授课热力图')
+para('点击「教学概览 → 授课热力日历 → 颜色范围」。填写前三档实际授课小时的上限，0 小时单独留白，超过第三档使用最深色。支持 0.25-24 小时内以 0.25 小时递增的数值，必须严格递增。')
+shot('tutor-heat-ranges.png', 220, '可预览图例、取消或保存；默认 1 / 2 / 4 小时，也可选授课较多的 2 / 4 / 8 小时预设。')
+para('设置保存在当前账号，备份恢复时保留；页面热力图和分享图片同步使用。调整颜色不会改写课程、课时或收入。', size=10)
+section('复制匿名教学概览图片')
+para('先选择日期和学生并点击“查看”，再点右上角“复制为图片”。图片按当前已应用范围完整排版，不受窗口宽度、滚动位置影响；复制成功后，在自己的聊天窗口粘贴。应用不会自动发送。')
+box('分享包含课时、执行、反馈汇总、匿名学生课时与当前学习需求。<b>不包含学生姓名、学校、授课地点、反馈文字、备注图片、时薪、收入、账号名或本机路径。</b>单学生筛选也会匿名；示例分享标明虚构数据。')
+para('剪贴板被占用时会短暂重试，仍失败可稍后再次点击。关闭窗口会取消待完成的复制；分享与查看图表不会改变教学记录。', size=10)
+
+page(9, '桌面入口、备份与换电脑' , '用快捷方式打开，把备份保存在程序文件夹之外。')
 section('在自己的电脑上创建桌面快捷方式')
 para('1. 在固定的解压文件夹中找到 E2Day.Tutor.exe。<br/>2. 右键程序 →「显示更多选项」（如有）→「发送到 → 桌面快捷方式」。<br/>3. 将快捷方式改名为“E²-Day Teacher”。<br/>4. 以后双击桌面图标；不要只移动 exe，也不要删除它指向的程序文件夹。')
 section('定期导出备份')
@@ -179,7 +190,7 @@ section('更新与卸载')
 para('更新前先导出备份并关闭旧版。把新版完整解压到新的固定文件夹，运行新 exe，沿用这台电脑原有家教版本机账号与记录；重新创建或更新桌面快捷方式，确认它指向新版。')
 para('删除程序文件夹只移除程序，不自动删除个人记录。家教版数据根目录为 %LOCALAPPDATA%\\E2DayTutor。准备清理个人数据前，先保存并确认可用的备份。', size=9.5, color=MUTED)
 
-page(9, '卡住时，按这里排查', '把提示文字发给作者，比反复点击更容易解决。')
+page(10, '卡住时，按这里排查', '把提示文字发给作者，比反复点击更容易解决。')
 items = [
 ('ZIP 提示损坏、无法解压', '先删除未下载完整的 ZIP，再从家教版发布页重新下载。需要时核对发布页 SHA256SUMS.txt；校验不一致时不要运行。'),
 ('提示“此应用无法在你的电脑上运行”', '重新检查系统类型并选择 x64 / ARM64。不要把 ARM64 包发给普通 Intel / AMD 电脑使用。'),
@@ -202,4 +213,4 @@ link('Microsoft Support：Smart App Control 常见问题', 'https://support.micr
 c.save()
 docs_out = ROOT / 'docs/E2-Day-Tutor-Guide.pdf'
 shutil.copyfile(OUT, docs_out)
-print(f'Created {OUT} ({OUT.stat().st_size} bytes); 9 pages')
+print(f'Created {OUT} ({OUT.stat().st_size} bytes); 10 pages')

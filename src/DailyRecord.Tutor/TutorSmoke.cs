@@ -96,8 +96,9 @@ internal static partial class TutorSmoke
         VerifyExamples(window, service, store, output);
         VerifyDashboard(window, service, store, output);
         window.Width = 1000; window.Height = 650; window.Navigate(0); Snapshot(window, Path.Combine(output, "tutor-compact.png")); Check(window.ActualWidth >= 0, "小窗口布局失败");
+        await VerifySyncedFeatures(window, service, store, output);
         await VerifyAppearanceAndScrolling(window, service, output);
-        var result = $"PASS Tutor WPF: {_checks} checks\nVersion: {Assembly.GetExecutingAssembly().GetName().Version}\nArchitecture: {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}\nIsolatedData: {store.DirectoryPath}\nStudents: {service.State.Students.Count}\nLessons: {service.State.Lessons.Count}\nScreenshots: 18\n"; File.WriteAllText(Path.Combine(output, "result.txt"), result);
+        var result = $"PASS Tutor WPF: {_checks} checks\nVersion: {Assembly.GetExecutingAssembly().GetName().Version}\nArchitecture: {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}\nIsolatedData: {store.DirectoryPath}\nStudents: {service.State.Students.Count}\nLessons: {service.State.Lessons.Count}\nScreenshots: 25\n"; File.WriteAllText(Path.Combine(output, "result.txt"), result);
         await Task.CompletedTask;
     }
 }

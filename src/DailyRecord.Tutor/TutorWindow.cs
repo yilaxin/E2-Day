@@ -11,9 +11,9 @@ namespace DailyRecord.App;
 
 public sealed partial class TutorWindow : Window
 {
-    private readonly TutorService _service;
-    private readonly TutorStore _store;
-    private readonly HolidayService _holidays;
+    private TutorService _service = null!;
+    private TutorStore _store = null!;
+    private HolidayService _holidays = null!;
     private readonly DateOnly? _fixedToday;
     private readonly StackPanel _body = new();
     private readonly TextBlock _title = Ui.Text("", 30, bold: true);
@@ -42,10 +42,18 @@ public sealed partial class TutorWindow : Window
     internal TutorService Service => _service;
     internal Action<string> WriteClipboard { get; set; } = Clipboard.SetText;
 
-    public TutorWindow(TutorService service, TutorStore store, DateOnly? today = null, bool isExample = false)
+    public TutorWindow() : this(null, false) { }
+    public TutorWindow(TutorService service, TutorStore store, DateOnly? today = null, bool isExample = false) : this(today, isExample)
+    { InitializeData(service, store); }
+    internal void InitializeData(TutorService service, TutorStore store)
     {
-        _service = service; _store = store; _fixedToday = today; IsExample = isExample; _month = new(Today.Year, Today.Month, 1); _from = _month; _to = Today;
+        _service = service; _store = store;
         _holidays = new HolidayService(Path.Combine(AppContext.BaseDirectory, "Data", "Holidays"), Path.Combine(store.DirectoryPath, "Holidays"));
+        Title = "E²-Day 家教版"; Navigate(0); _timer.Start();
+    }
+    private TutorWindow(DateOnly? today, bool isExample)
+    {
+        _fixedToday = today; IsExample = isExample; _month = new(Today.Year, Today.Month, 1); _from = _month; _to = Today;
         Title = "E²-Day 家教版"; Width = Math.Min(1380, SystemParameters.WorkArea.Width - 32); Height = Math.Min(940, SystemParameters.WorkArea.Height - 32); MinWidth = 1000; MinHeight = 650;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         var layout = new Grid { Background = Ui.Page, ClipToBounds = true }; layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) }); layout.ColumnDefinitions.Add(new ColumnDefinition()); Content = layout;
@@ -66,8 +74,7 @@ public sealed partial class TutorWindow : Window
         _scroller = new ScrollViewer { Content = _body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }; Grid.SetRow(_scroller, 1); main.Children.Add(_scroller);
         PageScroll = new SmoothWheelScroller(_scroller, () => true);
         var last = Today; _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
-        _timer.Tick += (_, _) => { if (last != Today) { last = Today; if (!OwnedWindows.Cast<Window>().Any()) Render(); } }; _timer.Start(); Closed += (_, _) => { _timer.Stop(); PageScroll.Dispose(); };
-        Navigate(0);
+        _timer.Tick += (_, _) => { if (last != Today) { last = Today; if (!OwnedWindows.Cast<Window>().Any()) Render(); } }; Closed += (_, _) => { _timer.Stop(); PageScroll.Dispose(); _lifetime.Cancel(); _noteThumbnails.Clear(); _thumbnailState = null; ClearPageResources(); SwitchAccount = null; };
     }
     internal void Navigate(int page, bool keepRecordRange = false) { if (page == 4 && !keepRecordRange) { _recordFrom = null; _recordTo = null; } PageScroll.Stop(); _page = page; _scroller.ScrollToTop(); Render(); }
     internal void SelectDate(DateOnly date) { _month = new(date.Year, date.Month, 1); _selectedDate = date; _year = false; Navigate(1); }
@@ -84,7 +91,7 @@ public sealed partial class TutorWindow : Window
     private void Render()
     {
         PageScroll.Stop();
-        _body.Children.Clear(); _actions.Children.Clear(); _saved.Text = _service.SaveStatus;
+        ClearPageResources(); _saved.Text = _service.SaveStatus;
         foreach (var pair in _nav) { pair.Value.Background = pair.Key == _page ? Ui.Selected : Brushes.Transparent; pair.Value.Foreground = pair.Key == _page ? Ui.Accent : Ui.Muted; }
         if (IsExample) _body.Children.Add(ExampleBanner());
         switch (_page) { case 0: TodayPage(); break; case 1: CalendarPage(); break; case 2: StudentPage(); break; case 3: StatisticsPage(); break; case 4: RecordsPage(); break; case 6: DashboardPage(); break; default: SettingsPage(); break; }
@@ -125,7 +132,7 @@ public sealed partial class TutorWindow : Window
         _body.Children.Add(Ui.Label("接下来七天"));
         foreach (var l in _service.Lessons(Today.AddDays(1), Today.AddDays(7)).Where(l => l.Status == LessonStatus.Planned).Take(5)) _body.Children.Add(LessonCard(l));
         _body.Children.Add(Ui.Label("备课与其他待办"));
-        var input = new TextBox { MinWidth = 220, MaxLength = 500, Tag = "todo-title" }; var add = Ui.Button("添加", () => Run(() => _service.AddTodo(input.Text)), true); add.Tag = "todo-add";
+        var input = new TextBox { Text = _todoDraft, MinWidth = 220, MaxLength = 500, Tag = "todo-title" }; input.TextChanged += (_, _) => _todoDraft = input.Text; var add = Ui.Button("添加", () => Run(() => { _service.AddTodo(input.Text); _todoDraft = ""; }), true); add.Tag = "todo-add";
         _body.Children.Add(Ui.Row(input, add));
         foreach (var todo in _service.State.Todos.OrderBy(t => t.Done))
         {
@@ -141,7 +148,7 @@ public sealed partial class TutorWindow : Window
         var badge = Ui.Badge(Status(lesson), lesson.Status == LessonStatus.Taught); Grid.SetColumn(badge, 1); heading.Children.Add(badge); panel.Children.Add(heading);
         panel.Children.Add(Ui.Text($"{lesson.Date:yyyy-MM-dd}  ·  {Hours(lesson.Minutes)} 小时  ·  ¥{lesson.HourlyRate:0.##}/小时  ·  " + (lesson.Status == LessonStatus.Taught ? $"收入 ¥{lesson.Income:N2}" : $"预计 ¥{decimal.Round(lesson.Minutes * lesson.HourlyRate / 60m, 2):N2}"), 12, Ui.Muted));
         if (!string.IsNullOrWhiteSpace(lesson.Content)) { var content = Ui.Text(lesson.Content, 13); content.MaxHeight = 52; content.TextTrimming = TextTrimming.CharacterEllipsis; content.Margin = new Thickness(0, 12, 0, 0); panel.Children.Add(content); }
-        if (lesson.ImageIds.Count > 0) panel.Children.Add(NoteImages.Gallery(_store.Images(lesson.ImageIds), this));
+        if (lesson.ImageIds.Count > 0) panel.Children.Add(LessonGallery(lesson.ImageIds));
         var buttons = new WrapPanel { Margin = new Thickness(0, 13, 0, 0) };
         var edit = Ui.Button(lesson.Status == LessonStatus.Taught ? "查看 / 编辑反馈" : "编辑 / 改期", () => AddLesson(lesson.Date, lesson)); edit.Tag = "edit:" + lesson.Id; buttons.Children.Add(edit);
         if (lesson.Status == LessonStatus.Planned) { var complete = Ui.Button("完成授课", () => AddLesson(lesson.Date, lesson, true), true); complete.Tag = "complete:" + lesson.Id; buttons.Children.Add(complete); }

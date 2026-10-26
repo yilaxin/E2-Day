@@ -222,5 +222,32 @@ Test("示例边界日期、备份往返与重复排课去重", (s, store, a) =>
     var path = Path.Combine(sample.DirectoryPath, "example.json"); sample.Export(path, service.State); var restored = TutorStore.ReadBackup(path).State;
     Check(JsonSerializer.Serialize(restored) == JsonSerializer.Serialize(service.State), "示例备份往返不一致");
 });
+Test("家教热力档位以分钟精确判断小时边界", (s, store, a) =>
+{
+    var scale = new TutorHeatmapScale(.5m, 1.5m, 3m);
+    Check(scale.IsValid && new[] { 0, 1, 30, 31, 90, 91, 180, 181 }.Select(scale.Level).SequenceEqual(new[] { 0, 1, 1, 2, 2, 3, 3, 4 }), "小时边界错误");
+    Check(new TutorHeatmapScale().Labels().SequenceEqual(new[] { "无授课", "≤1小时", "≤2小时", "≤4小时", ">4小时" }), "旧版档位没有保持");
+});
+Test("家教热力设置持久化、账号隔离与备份往返", (s, store, a) =>
+{
+    s.SaveLesson(Lesson(a)); var lesson = JsonSerializer.Serialize(s.State.Lessons); var stats = s.Statistics(new(2026,10,1), new(2026,10,31));
+    s.UpdateHeatmapScale(new(2,4,8)); Check(store.Load().HeatmapScale == new TutorHeatmapScale(2,4,8), "设置未持久化");
+    Check(lesson == JsonSerializer.Serialize(s.State.Lessons) && stats == s.Statistics(new(2026,10,1), new(2026,10,31)), "设置改变了课程或收入");
+    var path = Path.Combine(store.DirectoryPath, "heat.json"); store.Export(path, s.State);
+    using var other = new TutorStore(Path.Combine(store.DirectoryPath, "other")); var target = new TutorService(other);
+    Check(target.State.HeatmapScale == new TutorHeatmapScale(), "设置跨账号泄漏"); target.Restore(path); Check(target.State.HeatmapScale == new TutorHeatmapScale(2,4,8), "备份没有保留设置");
+});
+Test("非法颜色设置原子拒绝并保持原记录", (s, store, a) =>
+{
+    var before = JsonSerializer.Serialize(s.State);
+    foreach (var scale in new[] { new TutorHeatmapScale(0,2,4), new(1,1,4), new(3,2,4), new(1,2,25), new(.3m,2,4), new(-1,2,4), new(decimal.MaxValue,2,4) }) Reject(() => s.UpdateHeatmapScale(scale));
+    Reject(() => s.UpdateHeatmapScale(null!)); Check(before == JsonSerializer.Serialize(s.State) && before == JsonSerializer.Serialize(store.Load()), "失败设置写入了数据库");
+});
+Test("旧版无热力设置的数据使用默认档位", (s, store, a) =>
+{
+    var legacy = System.Text.Json.Nodes.JsonNode.Parse(JsonSerializer.Serialize(s.State))!; legacy.AsObject().Remove("HeatmapScale");
+    var state = JsonSerializer.Deserialize<TutorState>(legacy.ToJsonString())!; TutorRules.Validate(state); Check(state.HeatmapScale == new TutorHeatmapScale(), "旧记录缺省值错误");
+    state.HeatmapScale = null!; Reject(() => TutorRules.Validate(state));
+});
 Console.WriteLine($"Tutor core: {passed} passed, {failed} failed"); return failed == 0 ? 0 : 1;
 

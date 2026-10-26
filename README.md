@@ -4,22 +4,24 @@
 
 # E²-Day · 探索每一天
 
-**新增独立的 [E²-Day 家教版 1.1.1](https://github.com/yilaxin/E2-Day/releases/tag/tutor-v1.1.1)**：授课日历、学生档案、课后图文反馈、每周排课与课时收入统计。与日常版分别运行、分别保存数据。详见[家教版使用说明](docs/TUTOR-GUIDE.md)。
+**新增独立的 [E²-Day 家教版 1.2.0](https://github.com/yilaxin/E2-Day/releases/tag/tutor-v1.2.0)**：授课日历、学生档案、课后图文反馈、每周排课与课时收入统计。与日常版分别运行、分别保存数据。详见[家教版使用说明](docs/TUTOR-GUIDE.md)。
 
 | 家教版 Windows 下载 | 程序包 |
 | --- | --- |
-| Intel / AMD 64 位电脑 | [E2-Day-Tutor-v1.1.1-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/tutor-v1.1.1/E2-Day-Tutor-v1.1.1-win-x64.zip) |
-| ARM64 电脑 | [E2-Day-Tutor-v1.1.1-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/tutor-v1.1.1/E2-Day-Tutor-v1.1.1-win-arm64.zip) |
+| Intel / AMD 64 位电脑 | [E2-Day-Tutor-v1.2.0-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/tutor-v1.2.0/E2-Day-Tutor-v1.2.0-win-x64.zip) |
+| ARM64 电脑 | [E2-Day-Tutor-v1.2.0-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/tutor-v1.2.0/E2-Day-Tutor-v1.2.0-win-arm64.zip) |
 
 完整解压后运行 **E2Day.Tutor.exe**。以下原有说明与“下载最新版本”链接继续对应日常版。
 
-家教版 1.1.1 新增“教学概览”：授课热力日历、课程执行趋势、学生课时排行、课后反馈跟进及当前学习需求分布，支持日期与学生筛选、点击图表进入记录或档案。延续学校、授课地点与学习标签，以及粉紫玻璃界面。桌面名称为 **E²-Day Teacher**，图标使用原版 E²-Day logo。运行文件名、包结构和下方教程中的操作继续沿用家教版规则。
+家教版 1.2.0 新增“教学概览”：授课热力日历、课程执行趋势、学生课时排行、课后反馈跟进及当前学习需求分布，支持日期与学生筛选、点击图表进入记录或档案。延续学校、授课地点与学习标签，以及粉紫玻璃界面。桌面名称为 **E²-Day Teacher**，图标使用原版 E²-Day logo。运行文件名、包结构和下方教程中的操作继续沿用家教版规则。
 
-第一次使用请先阅读[图文 PDF 教程](https://github.com/yilaxin/E2-Day/releases/download/tutor-v1.1.1/E2-Day-Tutor-Guide-v1.1.1.pdf)，新程序包内也附带“先读我.txt”和“安装与使用教程.pdf”。当前程序没有数字签名，Windows 首次运行时仍可能出现信誉提醒；教程说明来源核对、安全提示、账号、使用与备份步骤。
+第一次使用请先阅读[图文 PDF 教程](https://github.com/yilaxin/E2-Day/releases/download/tutor-v1.2.0/E2-Day-Tutor-Guide-v1.2.0.pdf)，新程序包内也附带“先读我.txt”和“安装与使用教程.pdf”。当前程序没有数字签名，Windows 首次运行时仍可能出现信誉提醒；教程说明来源核对、安全提示、账号、使用与备份步骤。
 
 ![家教版教学概览](docs/images/tutor-dashboard.png)
 
 先体验再录入：在空白首页、空白教学概览或「设置与备份」点击 **“体验示例数据”**。独立窗口中有 6 位虚构学生、近三个月课程、收入、反馈与每周排课，可自由试用，关闭后丢弃本次修改，再次进入按当天重新生成。真实账号及备份保持原样。
+
+家教版 1.2.0 同步原版近期通用改进：同窗口 3.2 秒可跳过开场、轻量玻璃卡片与缩略图／旧页面资源回收、按账号保存的授课小时热力色阶，以及按所选日期／学生生成的匿名教学概览分享图片。原有教学记录与示例体验继续保留。
 
 **Explore Everyday Day** — 把全年安排、今天要做的事和已经完成的事，放进同一个 Windows 桌面 App，并通过手机主屏幕应用随身使用。
 
