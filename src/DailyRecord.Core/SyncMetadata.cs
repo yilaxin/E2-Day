@@ -26,7 +26,7 @@ public sealed class SyncMetadata
                 if (old is null || current is null) { changes.Add(Key(collection, id, "Record")); continue; }
                 foreach (var field in old.Select(p => p.Key).Concat(current.Select(p => p.Key)).Distinct())
                     if (!JsonNode.DeepEquals(old[field], current[field]))
-                        changes.Add(Key(collection, id, collection == "Tasks" && field is "State" or "CompletedOn" or "ArchiveReason" ? "Status" : field));
+                        changes.Add(Key(collection, id, collection == "Tasks" && field is "State" or "CompletedOn" or "ArchiveReason" or "CompletedOrigin" ? "Status" : field));
             }
         }
         if (!JsonNode.DeepEquals(b["Settings"], a["Settings"])) changes.Add(Key("Settings", "settings", "Record"));

@@ -463,6 +463,8 @@ FileImportTests.Run(Test, runRoot);
 LongTermTaskTests.Run(Test, Check, () => NewFixture());
 AnalyticsTests.Run(Test, Check, () => NewFixture());
 HeatmapScaleTests.Run(Test, Check, () => NewFixture());
+ItemConversionTests.Run(Test, Check, () => NewFixture(), runRoot);
+TaskColorTests.Run(Test, Check, () => NewFixture(), runRoot);
 
 if (args.Contains("--network"))
 {

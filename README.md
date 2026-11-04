@@ -33,6 +33,14 @@ Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese
 
 **新增鸿蒙原生版 0.1.1**：独立 ArkTS / ArkUI 应用，手机本机账号、离线任务与备注图片，手动与电脑交换 JSON。已在 Pura 70 / HarmonyOS 6.1 验证。公开构建为未签名 HAP，需用自己的开发者账号和设备签名；个人设备签名包不公开。[构建、签名及日常使用](docs/HARMONY-NATIVE.md)。既有网页手机入口继续使用。
 
+**五色任务分类（Windows 2.1.13）**：五种颜色可改名，支持单项／批量着色、按色筛选及未完成数量，当前分类可复制为图片。重要星标、完成淡化、备注原图和历史继续保留。
+
+![任务颜色分类（隔离样例）](docs/images/task-colors-today.png)
+
+**事项类型互相切换（Windows 2.1.12）**：在事项“更多”或编辑窗口中切换普通任务、日历事件和长期任务，保留备注原图、完成状态与历史。重复安排可选仅转换本次或停止原后续安排；保存前预览提醒及受影响待办。转换记录与手机交换请使用本版 Windows 或更新后的网页应用，旧原生客户端的新增字段往返尚未验证。
+
+![事项类型转换（隔离示例）](docs/images/item-conversion-editor.png)
+
 **Windows 日常版 · 玻璃拟态界面**：粉紫柔光背景、半透明圆角卡片和蓝紫操作按钮，覆盖今日清单、全年／月历、历史、设置与编辑窗口。金色重要标记、完成淡化和原有记录继续保留。
 
 **热力图颜色范围（2.1.8）**：在“数据概览 → 完成热力图 → 颜色范围”设置前三档上限。支持实时图例、高完成量预设、恢复默认及按账号保存，复制统计图片同步使用设置。
@@ -53,12 +61,12 @@ Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese
 
 ## 下载与开始使用
 
-Windows 日常版：**2.1.11**，改进隐藏年／月视图与旧页面内容的回收，保留原粉紫玻璃风格、硬件加速、统一平滑滚动、自定义热力图区间、统计分享、任务与图文备注，以及约 3.2 秒的大窗口开场。鸿蒙原生版仍为 0.1.1。下方提供对应 Windows 程序包。程序采用免安装、自包含的文件夹发布方式，下载包内已包含所需的 .NET 运行依赖。
+Windows 日常版：**2.1.13**，新增五色任务分类、批量着色、筛选计数与分类分享，保留原粉紫玻璃风格、硬件加速、统一平滑滚动、自定义热力图区间、统计分享、任务与图文备注，以及约 3.2 秒的大窗口开场。鸿蒙原生版仍为 0.1.1。下方提供对应 Windows 程序包。程序采用免安装、自包含的文件夹发布方式，下载包内已包含所需的 .NET 运行依赖。
 
 | 你的电脑 | 下载文件 |
 | --- | --- |
-| Intel / AMD 处理器的 64 位 Windows 电脑 | [E2-Day-v2.1.11-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.11/E2-Day-v2.1.11-win-x64.zip) |
-| Snapdragon 等 ARM 处理器的 Windows ARM64 电脑 | [E2-Day-v2.1.11-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.11/E2-Day-v2.1.11-win-arm64.zip) |
+| Intel / AMD 处理器的 64 位 Windows 电脑 | [E2-Day-v2.1.13-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.13/E2-Day-v2.1.13-win-x64.zip) |
+| Snapdragon 等 ARM 处理器的 Windows ARM64 电脑 | [E2-Day-v2.1.13-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.13/E2-Day-v2.1.13-win-arm64.zip) |
 
 1. 在 Windows“设置 → 系统 → 关于 → 系统类型”中确认电脑架构，选择对应下载包。
 2. **完整解压**到一个固定文件夹，保留程序旁边的 DLL、图标和 `Data` 文件夹。

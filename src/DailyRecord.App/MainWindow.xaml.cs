@@ -63,6 +63,7 @@ public partial class MainWindow : Window
         {
             _pageScroll.Dispose(); _calendarScroll.Dispose(); _monthScroll.Dispose();
             ReleasePageResources();
+            ClearColorSelection(); _colorBatchButton = null;
             _noteThumbnails.Clear(); _dayTimer.Stop(); _lifetime.Cancel();
             if (_initialized) _service.Changed -= UpdateSaveStatus;
         };
@@ -101,7 +102,7 @@ public partial class MainWindow : Window
         {
             if (_service.Today != _lastToday)
             {
-                _lastToday = _service.Today;
+                _lastToday = _service.Today; ClearColorSelection();
                 Run(_service.RefreshDay);
                 _ = RefreshNewsAsync(false);
             }
@@ -114,7 +115,7 @@ public partial class MainWindow : Window
     public void Navigate(PageKind page)
     {
         StopPageScrolling();
-        RememberDraft(); _page = page; _selectedMonth = null;
+        RememberDraft(); if (page != PageKind.Today) ClearColorSelection(); _page = page; _selectedMonth = null;
         if (page == PageKind.Year) CalendarScroller.ScrollToTop(); else PageScroller.ScrollToTop();
         RefreshPage();
     }
@@ -126,7 +127,7 @@ public partial class MainWindow : Window
     private void RefreshPage()
     {
         StopPageScrolling();
-        RememberDraft(); _quickInput = null; _quickImportant = null;
+        RememberDraft(); _quickInput = null; _quickImportant = null; _colorSelectionCaption = null; _colorBatchButton = null;
         ReleasePageFocus();
         _analyticsHabitPicker = null;
         ClearPageContent();
@@ -180,13 +181,15 @@ public partial class MainWindow : Window
             $"{today:yyyy 年}  ·  {information.Lunar}  ·  {information.WorkStatus}");
         Button? copyImage = null;
         copyImage = Ui.Button("复制为图片", async () => await CopyTodayTasksImageAsync(copyImage!));
-        copyImage.Tag = "copy-today-image"; copyImage.ToolTip = "复制今日待办和已完成为图片，粘贴即可分享";
+        copyImage.Tag = "copy-today-image"; copyImage.ToolTip = _taskColorFilter is null ? "复制今日待办和已完成为图片，粘贴即可分享" : "复制当前分类：待办、提前提醒、已查看及今日已完成";
         HeaderActions.Children.Add(copyImage);
         HeaderActions.Children.Add(Ui.Button("＋ 安排事件", () => OpenEventEditor(today)));
         HeaderActions.Children.Add(Ui.Button("＋ 添加任务", () => OpenTaskEditor(today), accent: true));
 
-        var open = _service.VisibleOpen(today).ToList();
-        var done = _service.State.Tasks.Where(t => t.State == TaskState.Completed && t.CompletedOn == today).ToList();
+        var allToday = _service.TodayColorTasks();
+        var filtered = allToday.Where(t => _taskColorFilter is null || t.Color == _taskColorFilter).ToList();
+        var open = filtered.Where(t => t.State == TaskState.Open).ToList();
+        var done = filtered.Where(t => t.State == TaskState.Completed).ToList();
         var viewed = open.Where(t => _service.IsViewed(t, today)).ToList();
         var pending = open.Where(t => !_service.IsViewed(t, today) && t.ScheduledDate <= today).ToList();
         var upcoming = open.Where(t => !_service.IsViewed(t, today) && t.ScheduledDate > today).ToList();
@@ -202,7 +205,7 @@ public partial class MainWindow : Window
             var card = GlassCardBorder.Create(caption, new Thickness(18, 15, 18, 14));
             card.Margin = new Thickness(0, 0, i < 2 ? 12 : 0, 0); Grid.SetColumn(card, i); stats.Children.Add(card);
         }
-        PageBody.Children.Add(stats);
+        PageBody.Children.Add(BuildTaskColorControls(allToday)); PageBody.Children.Add(stats);
 
         var left = new StackPanel();
         var eventTitles = _service.EventTitles(today);
@@ -248,7 +251,7 @@ public partial class MainWindow : Window
         var important = _quickImportant?.IsChecked == true;
         Run(() =>
         {
-            _service.AddTask(title, "", _service.Today, important);
+            _service.AddTask(title, "", _service.Today, important, color: _taskColorFilter ?? TaskColor.None);
             _quickDraft = ""; _quickFlag = false;
             if (_quickInput is not null) _quickInput.Text = "";
             if (_quickImportant is not null) _quickImportant.IsChecked = false;
@@ -281,6 +284,7 @@ public partial class MainWindow : Window
         var left = Ui.Stack(title); left.Margin = new Thickness(0, 0, 8, 0);
         var badges = new WrapPanel { Margin = new Thickness(0, 7, 0, 0) };
         if (task.IsImportant) badges.Children.Add(Ui.Badge("★ 重要任务", true));
+        if (task.Color != TaskColor.None) badges.Children.Add(ColorStyle.Badge(_service.State.Settings, task.Color));
         if (longTerm) badges.Children.Add(Ui.Badge("长期任务"));
         else if (task.IsEvent) badges.Children.Add(Ui.Badge(Ui.Importance(task.EventImportance), task.EventImportance != EventImportance.Normal));
         var dateLabel = task.ScheduledDate.ToString("M 月 d 日");
@@ -319,11 +323,24 @@ public partial class MainWindow : Window
             end.FontSize = 11; end.Foreground = Ui.Amber; end.Padding = new Thickness(5, 7, 5, 7);
             end.ToolTip = "结束整个长期任务，从现在起停止每天出现"; end.Tag = "end-long-term:" + task.Id; actions.Children.Add(end);
         }
-        var more = Ui.Button("⋯", () => { }, quiet: true); more.FontSize = 18; more.Padding = new Thickness(4, 2, 4, 2); more.ToolTip = "编辑、改期或取消";
+        var more = Ui.Button("⋯", () => { }, quiet: true); more.FontSize = 18; more.Padding = new Thickness(4, 2, 4, 2); more.ToolTip = "编辑、切换类型或取消"; more.Tag = "more:" + task.Id;
         var menu = new ContextMenu();
-        if (task.State != TaskState.Cancelled)
+        void AddTypeActions()
         {
             var edit = new MenuItem { Header = longTerm ? "编辑长期任务" : "编辑 / 改期" }; edit.Click += (_, _) => EditExisting(task, refresh); menu.Items.Add(edit);
+            foreach (var target in Enum.GetValues<ItemKind>().Where(k => k != _service.KindOf(task)))
+            {
+                var kind = target; var convert = new MenuItem { Header = kind == ItemKind.Task ? "转为普通任务" : kind == ItemKind.Event ? "转为日历事件" : "转为长期任务",
+                    Tag = $"convert:{task.Id}:{kind}" };
+                convert.Click += (_, _) => EditExisting(task, refresh, kind); menu.Items.Add(convert);
+            }
+        }
+        AddTypeActions();
+        menu.Items.Add(new Separator());
+        menu.Items.Add(ColorMenu((color, scope) => Run(() => _service.SetTaskColors([task], color, scope), refresh), task.Id,
+            task.IsEvent && _service.State.Events.Any(e => e.Id == task.EventId && e.Repeat != RepeatRule.None)));
+        if (task.State != TaskState.Cancelled)
+        {
             if (task.State == TaskState.Open && !longTerm)
             { var cancel = new MenuItem { Header = "取消并归档" }; cancel.Click += (_, _) => CancelExisting(task, refresh); menu.Items.Add(cancel); }
         }
@@ -333,46 +350,56 @@ public partial class MainWindow : Window
         { var resume = new MenuItem { Header = "重新开始长期任务" }; resume.Click += (_, _) => Run(() => _service.ResumeLongTerm(task), refresh); menu.Items.Add(resume); }
         more.ContextMenu = menu; more.Click += (_, _) => { menu.PlacementTarget = more; menu.IsOpen = true; }; actions.Children.Add(more);
         Grid.SetColumn(actions, 1); content.Children.Add(actions);
+        AddColorSelection(content, task);
         return new Border
         {
             Child = content, Padding = new Thickness(12, 11, 8, 11), Margin = new Thickness(0, 0, 0, 8),
-            CornerRadius = new CornerRadius(9), Background = task.IsImportant ? Ui.ImportantFill : Ui.SubtleSurface,
-            BorderBrush = task.IsImportant ? Ui.ImportantLine : Ui.Line,
-            BorderThickness = task.IsImportant ? new Thickness(3, 1, 1, 1) : new Thickness(1),
+            CornerRadius = new CornerRadius(9), Background = task.Color != TaskColor.None ? ColorStyle.Fill(task.Color) : task.IsImportant ? Ui.ImportantFill : Ui.SubtleSurface,
+            BorderBrush = task.Color != TaskColor.None ? ColorStyle.Line(task.Color) : task.IsImportant ? Ui.ImportantLine : Ui.Line,
+            BorderThickness = task.Color != TaskColor.None || task.IsImportant ? new Thickness(3, 1, 1, 1) : new Thickness(1),
             Opacity = dim || task.State != TaskState.Open ? 0.62 : 1
         };
     }
 
+    internal Func<EditDialog, bool?>? ItemEditorPresenter { get; set; }
+    private bool? ShowItemEditor(EditDialog dialog) => ItemEditorPresenter is { } present ? present(dialog) : dialog.ShowDialog();
+    private void SaveNewItem(EditDialog dialog)
+    {
+        if (dialog.Kind == ItemKind.LongTerm) _service.AddLongTermTask(dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.ImportantTask, dialog.Images, dialog.Color);
+        else if (dialog.Kind == ItemKind.Event) _service.AddEvent(dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.Importance, dialog.Repeat, dialog.Images, dialog.ImportantTask, dialog.Color);
+        else _service.AddTask(dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.ImportantTask, dialog.Images, dialog.Color);
+    }
     private void OpenTaskEditor(DateOnly date, Action? refresh = null)
     {
-        var dialog = new EditDialog(this, date, false);
-        if (dialog.ShowDialog() == true) Run(() =>
-        {
-            if (dialog.LongTermTask) _service.AddLongTermTask(dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.ImportantTask, dialog.Images);
-            else _service.AddTask(dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.ImportantTask, dialog.Images);
-        }, refresh);
+        var dialog = new EditDialog(this, date, false, service: _service, initialColor: _taskColorFilter);
+        if (ShowItemEditor(dialog) == true) Run(() => SaveNewItem(dialog), refresh);
     }
     private void OpenEventEditor(DateOnly date, Action? refresh = null)
     {
-        var dialog = new EditDialog(this, date, true);
-        if (dialog.ShowDialog() == true) Run(() => _service.AddEvent(dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.Importance, dialog.Repeat, dialog.Images), refresh);
+        var dialog = new EditDialog(this, date, true, service: _service, initialColor: _taskColorFilter);
+        if (ShowItemEditor(dialog) == true) Run(() => SaveNewItem(dialog), refresh);
     }
-    private void EditExisting(TaskItem task, Action? refresh = null)
+    private void EditExisting(TaskItem task, Action? refresh = null, ItemKind? target = null)
     {
         var ev = task.IsEvent ? _service.State.Events.FirstOrDefault(e => e.Id == task.EventId) : null;
         var longTerm = _service.IsLongTerm(task);
-        var dialog = new EditDialog(this, longTerm ? ev!.StartDate : task.ScheduledDate, task.IsEvent && !longTerm, task, ev, _service.GetNoteImages(task.ImageIds));
-        if (dialog.ShowDialog() != true) return;
+        var dialog = new EditDialog(this, task.ScheduledDate, task.IsEvent && !longTerm, task, ev, _service.GetNoteImages(task.ImageIds), _service, target);
+        if (ShowItemEditor(dialog) != true) return;
         Run(() =>
         {
-            if (longTerm) _service.EditLongTerm(task, dialog.ItemTitle, dialog.Notes, dialog.ImportantTask, dialog.Images);
+            if (dialog.Kind != _service.KindOf(task))
+                _service.ConvertItem(task, dialog.Kind, dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.ImportantTask, dialog.Importance, dialog.Repeat, dialog.Scope, dialog.Images, dialog.Color);
+            else if (task.State == TaskState.Cancelled)
+                _service.EditTask(task, dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.ImportantTask, dialog.Images);
+            else if (longTerm) _service.EditLongTerm(task, dialog.ItemTitle, dialog.Notes, dialog.ImportantTask, dialog.Images);
             else if (task.IsEvent)
             {
                 _service.EditEvent(task, dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.Importance, dialog.Repeat, dialog.Scope, dialog.Images);
                 if (task.IsImportant != dialog.ImportantTask) _service.ToggleImportant(task);
             }
-            else if (dialog.LongTermTask) _service.ConvertToLongTerm(task, dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.ImportantTask, dialog.Images);
             else _service.EditTask(task, dialog.ItemTitle, dialog.Notes, dialog.Date, dialog.ImportantTask, dialog.Images);
+            if (task.Color != dialog.Color || dialog.ColorScope == EditScope.ThisAndFuture)
+                _service.SetTaskColors([task], dialog.Color, dialog.ColorScope);
         }, refresh);
     }
     private void CancelExisting(TaskItem task, Action? refresh = null)

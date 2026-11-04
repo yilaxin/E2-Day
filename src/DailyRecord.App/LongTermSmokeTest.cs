@@ -15,7 +15,7 @@ internal static partial class SmokeTest
         {
             var editor = new EditDialog(window, today, false);
             Descendants(editor).OfType<TextBox>().Single(t => Equals(t.Tag, "task-title")).Text = "每天推进毕业论文，直到完成整个项目";
-            var checkbox = Descendants(editor).OfType<CheckBox>().Single(c => Equals(c.Tag, "long-term-task")); checkbox.IsChecked = true;
+            var kind = Descendants(editor).OfType<ComboBox>().Single(c => Equals(c.Tag, "item-kind")); kind.SelectedIndex = (int)ItemKind.LongTerm;
             Check(editor.LongTermTask, "长期任务选项没有生效。");
             Render((FrameworkElement)editor.Content, 560, 820, Path.Combine(output, "long-term-editor.png"));
             var first = service.AddLongTermTask(editor.ItemTitle, "每天记录一点进度，项目结束时手动结束。", editor.Date, true);

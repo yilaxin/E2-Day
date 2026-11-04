@@ -14,25 +14,39 @@ internal static class TaskShareImage
 {
     internal const double LayoutWidth = 760;
 
-    public static Border Build(TaskService service, HolidayService holidays)
+    public static Border Build(TaskService service, HolidayService holidays, TaskColor? color = null)
     {
         var today = service.Today;
-        var pending = service.VisibleOpen(today).Where(t => t.ScheduledDate <= today && !service.IsViewed(t, today)).ToList();
-        var completed = TaskService.Sort(service.State.Tasks.Where(t => t.State == TaskState.Completed && t.CompletedOn == today)).ToList();
+        var filtered = service.FilterToday(color);
+        var open = filtered.Where(t => t.State == TaskState.Open).ToList();
+        var pending = open.Where(t => t.ScheduledDate <= today && !service.IsViewed(t, today)).ToList();
+        var completed = filtered.Where(t => t.State == TaskState.Completed).ToList();
+        var upcoming = open.Where(t => t.ScheduledDate > today && !service.IsViewed(t, today)).ToList();
+        var viewed = open.Where(t => service.IsViewed(t, today)).ToList();
         var information = holidays.ForDay(today);
         var body = new StackPanel();
         var brand = Ui.Text("E²-Day  ·  每一天，都有自己的节奏", 12, Ui.Accent);
         brand.Margin = new Thickness(0, 0, 0, 14); body.Children.Add(brand);
         body.Children.Add(Ui.Text("今日任务", 34, bold: true));
+        if (color is { } category)
+        {
+            var label = Ui.Text("分类：" + ColorStyle.Label(service.State.Settings, category), 18, ColorStyle.Line(category), true);
+            label.Tag = "share-color-label"; label.Margin = new Thickness(0, 10, 0, 0); body.Children.Add(label);
+        }
         var date = Ui.Text(today.ToString("yyyy 年 M 月 d 日 · dddd", CultureInfo.GetCultureInfo("zh-CN")), 16, Ui.Muted);
         date.Margin = new Thickness(0, 9, 0, 0); body.Children.Add(date);
         var context = Ui.Text(string.Join(" · ", new[] { information.Lunar, information.Festivals }.Where(s => s.Length > 0)), 12, Ui.Muted);
         context.Margin = new Thickness(0, 5, 0, 20); body.Children.Add(context);
-        var stats = Ui.Row(Ui.Badge($"待办 {pending.Count} 项"), Ui.Badge($"已完成 {completed.Count} 项"),
-            Ui.Badge($"★ 重要 {pending.Concat(completed).Count(t => t.IsImportant)} 项", true));
+        var stats = Ui.Row(Ui.Badge($"待办 {(color is null ? pending.Count : open.Count)} 项"), Ui.Badge($"已完成 {completed.Count} 项"),
+            Ui.Badge($"★ 重要 {(color is null ? pending : open).Concat(completed).Count(t => t.IsImportant)} 项", true));
         stats.Margin = new Thickness(0, 0, 0, 24); body.Children.Add(stats);
-        AddGroup(body, "今日待办", pending, today, "今天没有待办任务。", false);
-        AddGroup(body, "今日已完成", completed, today, "今天还没有已完成任务。", true);
+        AddGroup(body, "今日待办", pending, today, "今天没有待办任务。", false, service.State.Settings);
+        if (color is not null)
+        {
+            if (upcoming.Count > 0) AddGroup(body, "提前提醒", upcoming, today, "", false, service.State.Settings);
+            if (viewed.Count > 0) AddGroup(body, "今日已查看 · 仍未完成", viewed, today, "", false, service.State.Settings);
+        }
+        AddGroup(body, "今日已完成", completed, today, "今天还没有已完成任务。", true, service.State.Settings);
         var footer = Ui.Text($"E²-Day · 探索每一天    {today:M 月 d 日}", 11, Ui.Muted); footer.Tag = "share-footer";
         footer.Margin = new Thickness(0, 20, 0, 0); body.Children.Add(footer);
         var card = new Border
@@ -47,7 +61,7 @@ internal static class TaskShareImage
         return root;
     }
 
-    private static void AddGroup(StackPanel body, string heading, IReadOnlyList<TaskItem> tasks, DateOnly today, string empty, bool completed)
+    private static void AddGroup(StackPanel body, string heading, IReadOnlyList<TaskItem> tasks, DateOnly today, string empty, bool completed, UserSettings settings)
     {
         var title = Ui.Text($"{heading}  ·  {tasks.Count} 项", 18, Ui.Accent, true);
         title.Margin = new Thickness(0, 0, 0, 12); body.Children.Add(title);
@@ -65,6 +79,7 @@ internal static class TaskShareImage
             if (completed) caption.TextDecorations = TextDecorations.Strikethrough;
             var text = Ui.Stack(caption);
             var details = new List<string>();
+            if (task.Color != TaskColor.None) details.Add(TaskColors.Name(settings, task.Color));
             if (task.IsImportant) details.Add("★ 重要任务");
             if (task.ScheduledDate < today && !completed) details.Add($"逾期 · 原定 {task.ScheduledDate:M 月 d 日}");
             else if (task.ScheduledDate != today) details.Add($"原定 {task.ScheduledDate:M 月 d 日}");
@@ -77,8 +92,9 @@ internal static class TaskShareImage
             var item = new Border
             {
                 Child = row, Padding = new Thickness(14), CornerRadius = new CornerRadius(10),
-                Background = task.IsImportant ? Ui.ImportantFill : Ui.SubtleSurface,
-                BorderBrush = task.IsImportant ? Ui.ImportantLine : Ui.Line, BorderThickness = new Thickness(1),
+                Background = task.Color != TaskColor.None ? ColorStyle.Fill(task.Color) : task.IsImportant ? Ui.ImportantFill : Ui.SubtleSurface,
+                BorderBrush = task.Color != TaskColor.None ? ColorStyle.Line(task.Color) : task.IsImportant ? Ui.ImportantLine : Ui.Line,
+                BorderThickness = new Thickness(task.Color == TaskColor.None ? 1 : 3, 1, 1, 1),
                 Margin = new Thickness(0, 0, 0, 9), Opacity = completed ? 0.6 : 1
             };
             body.Children.Add(item);
@@ -131,7 +147,11 @@ public partial class MainWindow
 {
     internal TaskImageClipboard ImageClipboard { get; set; } = new();
 
-    private Task CopyTodayTasksImageAsync(Button button) => CopyImageAsync(button, () => TaskShareImage.Render(TaskShareImage.Build(_service, _holidays)));
+    private Task CopyTodayTasksImageAsync(Button button)
+    {
+        var filter = _taskColorFilter;
+        return CopyImageAsync(button, () => TaskShareImage.Render(TaskShareImage.Build(_service, _holidays, filter)));
+    }
 
     private async Task CopyImageAsync(Button button, Func<BitmapSource> render)
     {

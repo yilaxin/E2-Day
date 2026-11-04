@@ -44,22 +44,31 @@ public sealed partial class TaskService
     private void EnsureUpcoming()
     {
         foreach (var ev in State.Events)
-            foreach (var day in Recurrence.Between(ev, ev.Repeat == RepeatRule.Daily ? Today : ev.StartDate,
+            foreach (var day in Occurrences(ev, ev.Repeat == RepeatRule.Daily ? Today : ev.StartDate,
                          ev.Repeat == RepeatRule.Daily ? Today : Today.AddDays(State.Settings.LeadDays(ev.Importance))))
                 EnsureOccurrence(ev, day);
     }
 
     public TaskItem EnsureOccurrence(EventDefinition ev, DateOnly occurrence)
     {
+        var converted = State.Tasks.FirstOrDefault(t => t.ConversionSources.Contains(new OccurrenceLink(ev.Id, occurrence)));
+        if (converted is not null) return converted;
         var existing = State.Tasks.FirstOrDefault(t => t.EventId == ev.Id &&
             (ev.Repeat == RepeatRule.None || t.OccurrenceDate == occurrence));
         if (existing is not null) return existing;
+        var id = OccurrenceId(ev.Id, occurrence);
+        var reserved = State.Tasks.FirstOrDefault(t => t.Id == id);
+        if (reserved is not null && reserved.EventId != ev.Id)
+        {
+            // An older exporter may omit the new conversion metadata while keeping the original identity.
+            reserved.ConversionSources.Add(new(ev.Id, occurrence)); Revision++; return reserved;
+        }
         var task = new TaskItem
         {
-            Id = OccurrenceId(ev.Id, occurrence),
+            Id = reserved is null ? id : Guid.NewGuid().ToString("N"),
             EventId = ev.Id, OccurrenceDate = occurrence, ScheduledDate = occurrence,
             OriginalScheduledDate = occurrence, Title = ev.Title, Notes = ev.Notes,
-            ImageIds = [.. ev.ImageIds], IsImportant = ev.IsImportant,
+            ImageIds = [.. ev.ImageIds], IsImportant = ev.IsImportant, Color = ev.Color,
             EventImportance = ev.Importance, CreatedAt = _clock.Now
         };
         State.Tasks.Add(task);
@@ -67,23 +76,26 @@ public sealed partial class TaskService
         return task;
     }
 
-    public TaskItem AddTask(string title, string notes, DateOnly date, bool important = false, IReadOnlyList<NoteImage>? images = null)
+    public TaskItem AddTask(string title, string notes, DateOnly date, bool important = false, IReadOnlyList<NoteImage>? images = null, TaskColor color = TaskColor.None)
     {
         ValidateTitle(title);
+        if (!Enum.IsDefined(color)) throw new ArgumentException("分类颜色无效。");
         var ids = PrepareImages(images);
         var task = new TaskItem
         {
             Title = title.Trim(), Notes = notes.Trim(), ScheduledDate = date,
-            OriginalScheduledDate = date, IsImportant = important, CreatedAt = _clock.Now, ImageIds = ids
+            OriginalScheduledDate = date, IsImportant = important, CreatedAt = _clock.Now, ImageIds = ids, Color = color
         };
         State.Tasks.Add(task);
         Save(images);
         return task;
     }
 
-    public EventDefinition AddEvent(string title, string notes, DateOnly date, EventImportance importance, RepeatRule repeat, IReadOnlyList<NoteImage>? images = null)
+    public EventDefinition AddEvent(string title, string notes, DateOnly date, EventImportance importance, RepeatRule repeat, IReadOnlyList<NoteImage>? images = null, bool important = false, TaskColor color = TaskColor.None)
     {
         var ev = CreateDefinition(title, notes, date, importance, repeat);
+        if (!Enum.IsDefined(color)) throw new ArgumentException("分类颜色无效。");
+        ev.IsImportant = important; ev.Color = color;
         ev.ImageIds = PrepareImages(images);
         State.Events.Add(ev);
         EnsureUpcoming();
@@ -112,7 +124,7 @@ public sealed partial class TaskService
         Save();
     }
 
-    public bool IsViewed(TaskItem task, DateOnly day) => State.Activities.Any(a =>
+    public bool IsViewed(TaskItem task, DateOnly day) => task.IsEvent && !IsLongTerm(task) && State.Activities.Any(a =>
         a.TaskId == task.Id && a.Kind == ActivityKind.Viewed && a.Day == day && !a.Reverted);
 
     public void ToggleViewed(TaskItem task)
@@ -132,6 +144,7 @@ public sealed partial class TaskService
         {
             task.State = TaskState.Open;
             task.CompletedOn = null;
+            task.CompletedOrigin = null;
             foreach (var activity in State.Activities.Where(a => a.TaskId == task.Id && a.Kind == ActivityKind.Completed && !a.Reverted))
                 activity.Reverted = true;
         }
@@ -139,6 +152,7 @@ public sealed partial class TaskService
         {
             task.State = TaskState.Completed;
             task.CompletedOn = Today;
+            task.CompletedOrigin = CaptureCompletionOrigin(task);
             State.Activities.Add(Snapshot(task, ActivityKind.Completed));
         }
         Save();
@@ -186,9 +200,11 @@ public sealed partial class TaskService
         EventImportance importance, RepeatRule repeat, EditScope scope, IReadOnlyList<NoteImage>? images = null)
     {
         var old = State.Events.Single(e => e.Id == selected.EventId);
+        if (selected.State == TaskState.Completed) selected.CompletedOrigin ??= CaptureCompletionOrigin(selected);
         var replacement = CreateDefinition(title, notes, date, importance,
             old.Repeat != RepeatRule.None && scope == EditScope.ThisOccurrence ? RepeatRule.None : repeat);
         replacement.ImageIds = images is null ? [.. selected.ImageIds] : PrepareImages(images);
+        replacement.Color = old.Color;
         if (replacement.Repeat == RepeatRule.Daily) replacement.IsImportant = selected.IsImportant;
         if (old.Repeat == RepeatRule.None)
         {
@@ -272,7 +288,7 @@ public sealed partial class TaskService
     public List<TaskItem> ForDate(DateOnly day)
     {
         foreach (var ev in State.Events)
-            foreach (var occurrence in Recurrence.Between(ev, day, day)) EnsureOccurrence(ev, occurrence);
+            foreach (var occurrence in Occurrences(ev, day, day)) EnsureOccurrence(ev, occurrence);
         return Sort(State.Tasks.Where(t => t.ScheduledDate == day || t.OriginalScheduledDate == day ||
             t.CompletedOn == day || State.Activities.Any(a => a.TaskId == t.Id && a.Day == day && !a.Reverted))).ToList();
     }
@@ -281,13 +297,14 @@ public sealed partial class TaskService
     {
         var actual = State.Tasks.Count(t => t.ScheduledDate == day && t.State != TaskState.Cancelled);
         foreach (var ev in State.Events)
-            foreach (var occurrence in Recurrence.Between(ev, day, day))
+            foreach (var occurrence in Occurrences(ev, day, day))
                 if (!State.Tasks.Any(t => t.EventId == ev.Id && (ev.Repeat == RepeatRule.None || t.OccurrenceDate == occurrence))) actual++;
         return actual;
     }
 
     public IReadOnlyDictionary<DateOnly, CalendarDaySummary> CalendarForYear(int year)
     {
+        var excluded = State.Tasks.SelectMany(t => t.ConversionSources).ToLookup(s => s.EventId, s => s.Day);
         var from = new DateOnly(year, 1, 1);
         var to = new DateOnly(year, 12, 31);
         var days = new Dictionary<DateOnly, CalendarDayBuilder>();
@@ -313,7 +330,7 @@ public sealed partial class TaskService
             if (task.IsEvent) day.Titles.Add((task.State == TaskState.Completed ? "✓ " + task.Title : task.Title, task.EventImportance));
         }
         foreach (var ev in State.Events)
-            foreach (var occurrence in Recurrence.Between(ev, from, to))
+            foreach (var occurrence in Occurrences(ev, from, to, excluded))
             {
                 if (ev.Repeat == RepeatRule.None ? existingEvents.Contains(ev.Id) : existingOccurrences.Contains((ev.Id, occurrence))) continue;
                 var day = Day(occurrence);
@@ -343,7 +360,7 @@ public sealed partial class TaskService
         var titles = State.Tasks.Where(t => t.IsEvent && t.ScheduledDate == day && t.State != TaskState.Cancelled)
             .Select(t => (Title: t.State == TaskState.Completed ? "✓ " + t.Title : t.Title, t.EventImportance)).ToList();
         foreach (var ev in State.Events)
-            foreach (var occurrence in Recurrence.Between(ev, day, day))
+            foreach (var occurrence in Occurrences(ev, day, day))
                 if (!State.Tasks.Any(t => t.EventId == ev.Id && (ev.Repeat == RepeatRule.None || t.OccurrenceDate == occurrence)))
                     titles.Add((ev.Title, ev.Importance));
         return titles.OrderByDescending(t => t.Item2).Select(t => t.Title).ToList();
@@ -410,7 +427,7 @@ public sealed partial class TaskService
     private ActivityRecord Snapshot(TaskItem task, ActivityKind kind) => new()
     {
         TaskId = task.Id, Kind = kind, Day = Today, At = _clock.Now,
-        Title = task.Title, Notes = task.Notes, ImageIds = [.. task.ImageIds], ScheduledDate = task.ScheduledDate, IsImportant = task.IsImportant
+        Title = task.Title, Notes = task.Notes, ImageIds = [.. task.ImageIds], ScheduledDate = task.ScheduledDate, IsImportant = task.IsImportant, Color = task.Color
     };
     public IReadOnlyList<NoteImage> GetNoteImages(IEnumerable<string> ids) => _store.GetNoteImages(ids);
     public void ExportBackup(string path) => _store.ExportBackup(path, State);

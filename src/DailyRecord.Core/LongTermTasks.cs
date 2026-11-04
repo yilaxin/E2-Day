@@ -4,30 +4,25 @@ public sealed partial class TaskService
 {
     public bool IsLongTerm(TaskItem task) => Definition(task)?.Repeat == RepeatRule.Daily;
     public bool IsLongTermActive(TaskItem task) => Definition(task) is { Repeat: RepeatRule.Daily } ev &&
-        (ev.EndDate is null || ev.EndDate >= Today);
+        (ev.EndDate is null || ev.EndDate >= Today && ev.EndDate >= ev.StartDate);
     private bool IsLongTermActive(TaskItem task, DateOnly day) => Definition(task) is { Repeat: RepeatRule.Daily } ev &&
         ev.StartDate <= day && (ev.EndDate is null || ev.EndDate >= day);
     private EventDefinition? Definition(TaskItem task) => State.Events.FirstOrDefault(e => e.Id == task.EventId);
     private EventDefinition LongTermDefinition(TaskItem task) => Definition(task) is { Repeat: RepeatRule.Daily } ev ? ev :
         throw new ArgumentException("此任务不是长期任务。");
 
-    public TaskItem AddLongTermTask(string title, string notes, DateOnly start, bool important = false, IReadOnlyList<NoteImage>? images = null)
+    public TaskItem AddLongTermTask(string title, string notes, DateOnly start, bool important = false, IReadOnlyList<NoteImage>? images = null, TaskColor color = TaskColor.None)
     {
         var ev = CreateDefinition(title, notes, start, EventImportance.Normal, RepeatRule.Daily);
-        ev.IsImportant = important; ev.ImageIds = PrepareImages(images);
+        if (!Enum.IsDefined(color)) throw new ArgumentException("分类颜色无效。");
+        ev.IsImportant = important; ev.ImageIds = PrepareImages(images); ev.Color = color;
         State.Events.Add(ev); var task = EnsureOccurrence(ev, start); EnsureUpcoming(); Save(images); return task;
     }
 
     public void ConvertToLongTerm(TaskItem task, string title, string notes, DateOnly start, bool important, IReadOnlyList<NoteImage>? images = null)
     {
         if (task.IsEvent) throw new ArgumentException("日历事件请使用重复规则设置长期任务。");
-        var ev = CreateDefinition(title, notes, start, EventImportance.Normal, RepeatRule.Daily);
-        ev.IsImportant = important; ev.ImageIds = images is null ? [.. task.ImageIds] : PrepareImages(images);
-        State.Events.Add(ev);
-        task.EventId = ev.Id; task.OccurrenceDate = start; task.ScheduledDate = start; task.Title = ev.Title;
-        task.Notes = ev.Notes; task.ImageIds = [.. ev.ImageIds]; task.IsImportant = important;
-        task.EventImportance = EventImportance.Normal; task.HasOverride = false;
-        EnsureUpcoming(); Save(images);
+        ConvertItem(task, ItemKind.LongTerm, title, notes, start, important, images: images);
     }
 
     public void EditLongTerm(TaskItem selected, string title, string notes, bool important, IReadOnlyList<NoteImage>? images = null)

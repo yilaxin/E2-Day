@@ -22,12 +22,21 @@ export function validateMobileState(state){
  const validTime=value=>typeof value==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,7})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)&&Number.isFinite(Date.parse(value));
  if(!state||![1,2].includes(state.SchemaVersion)||!Array.isArray(state.Tasks)||!Array.isArray(state.Events)||!Array.isArray(state.Activities)||!state.Settings||!state.News||!Array.isArray(state.News.Articles))fail();
  const records=[...state.Tasks,...state.Events,...state.Activities];
+ for(const row of records)if(row?.Color!==undefined&&!['None','Blue','Purple','Teal','Pink','Gray'].includes(row.Color))fail();
+ const names=state.Settings.TaskColorNames;
+ if(names!==undefined&&(!Array.isArray(names)||names.length!==5||names.some(n=>typeof n!=='string'||!n.trim()||n!==n.trim()||n.length>12||/[\u0000-\u001f\u007f-\u009f]/.test(n)||['全部','未分类'].includes(n))||new Set(names.map(n=>n.toLowerCase())).size!==5))fail();
+ if(state.Tasks.some(t=>t?.ColorOverride!==undefined&&typeof t.ColorOverride!=='boolean'))fail();
  for(const collection of [state.Tasks,state.Events,state.Activities])if(collection.some(row=>!row||typeof row.Id!=='string'||!row.Id)||new Set(collection.map(row=>row.Id)).size!==collection.length)fail();
  for(const row of records)if(typeof row.Title!=='string'||!row.Title.trim()||typeof row.Notes!=='string'||!Array.isArray(row.ImageIds)||row.ImageIds.length>8||new Set(row.ImageIds).size!==row.ImageIds.length||row.ImageIds.some(id=>typeof id!=='string'||! /^[A-F0-9]{64}$/.test(id)))fail();
  const events=new Set(state.Events.map(row=>row.Id)),tasks=new Set(state.Tasks.map(row=>row.Id)),occurrencesSeen=new Set();
  for(const row of state.Events)if(!validDate(row.StartDate)||!['Normal','Important','VeryImportant'].includes(row.Importance)||!['None','Weekly','Monthly','Yearly','LunarYearly','Daily'].includes(row.Repeat)||row.Repeat==='LunarYearly'&&(!Number.isInteger(row.LunarMonth)||row.LunarMonth<1||row.LunarMonth>12||!Number.isInteger(row.LunarDay)||row.LunarDay<1||row.LunarDay>30))fail();
  for(const row of state.Tasks){if(!validDate(row.ScheduledDate)||!validDate(row.OriginalScheduledDate)||!['Open','Completed','Cancelled'].includes(row.State)||!['Normal','Important','VeryImportant'].includes(row.EventImportance)||typeof row.CreatedAt!=='string'||row.CompletedOn!==null&&row.CompletedOn!==undefined&&!validDate(row.CompletedOn)||row.State==='Completed'&&!row.CompletedOn)fail();if(row.EventId){const key=row.EventId+'/'+row.OccurrenceDate;if(!events.has(row.EventId)||!validDate(row.OccurrenceDate)||occurrencesSeen.has(key))fail();occurrencesSeen.add(key);}}
- for(const row of state.Tasks)if(!validTime(row.CreatedAt))fail();
+ const converted=new Set();
+ for(const row of state.Tasks){if(!validTime(row.CreatedAt))fail();
+  if(row.ConversionSources!==undefined&&(!Array.isArray(row.ConversionSources)))fail();
+  for(const source of row.ConversionSources||[]){if(!source||!events.has(source.EventId)||!validDate(source.Day))fail();const key=source.EventId+'/'+source.Day;if(converted.has(key)||occurrencesSeen.has(key))fail();converted.add(key);}
+  const origin=row.CompletedOrigin;if(origin!=null&&(!['None','Weekly','Monthly','Yearly','LunarYearly','Daily'].includes(origin.Repeat)||origin.EventId!=null&&!events.has(origin.EventId)||origin.Day!=null&&!validDate(origin.Day)||origin.Repeat==='Daily'&&(!origin.EventId||!origin.Day)))fail();
+ }
  for(const row of state.Activities)if(!tasks.has(row.TaskId)||!validDate(row.Day)||!validDate(row.ScheduledDate)||!validTime(row.At)||!['Viewed','Completed','Cancelled','Ended'].includes(row.Kind))fail();
  if(['NormalDays','ImportantDays','VeryImportantDays'].some(key=>!Number.isInteger(state.Settings[key])||state.Settings[key]<0||state.Settings[key]>365))fail();
  return state;
@@ -44,6 +53,8 @@ export function occurrences(event,from,to,lunar={}){
  else if(event.Repeat==='LunarYearly'){for(const date of lunar[`${event.LunarMonth}-${event.LunarDay}`]||[])push(date);}
  return result;
 }
+export function convertedOccurrence(state,eventId,day){return state.Tasks.some(task=>(task.ConversionSources||[]).some(source=>source.EventId===eventId&&source.Day===day));}
+export function completionOrigin(state,task){const event=state.Events.find(e=>e.Id===task.EventId);return {EventId:event?.Id??null,Day:task.OccurrenceDate??null,Repeat:event?.Repeat??'None'};}
 let database,profile=null,page='today',selectedDay=today(),month=selectedDay.slice(0,7),lunar={},savedText='已保存到本机',offlineReady=false;
 let objectUrls=[],editorUrls=[];
 const profileWriter=new ProfileWriter(()=>profile,async next=>{await put('kv',`profile:${next.Id}`,next);profile=next;});
@@ -77,14 +88,19 @@ async function unlock(stored,password){
 async function ensureUpcoming(){
  if(!profile)return;const id=profile.Id;await profileWriter.update(id,async next=>{let changed=false;
  for(const event of next.State.Events){const lead=next.State.Settings[`${event.Importance==='Normal'?'Normal':event.Importance==='Important'?'Important':'VeryImportant'}Days`]||0;
-  for(const date of occurrences(event,event.Repeat==='Daily'?today():event.StartDate,event.Repeat==='Daily'?today():addDays(today(),lead),lunar))if(!next.State.Tasks.some(task=>task.EventId===event.Id&&(event.Repeat==='None'||task.OccurrenceDate===date))){
-   next.State.Tasks.push({Id:(await digest(`${event.Id}:${date}`)).slice(0,32).toLowerCase(),EventId:event.Id,OccurrenceDate:date,ScheduledDate:date,OriginalScheduledDate:date,Title:event.Title,Notes:event.Notes,ImageIds:[...event.ImageIds],EventImportance:event.Importance,IsImportant:!!event.IsImportant,HasOverride:false,State:'Open',CreatedAt:new Date().toISOString(),CompletedOn:null,ArchiveReason:''});changed=true;
+  for(const date of occurrences(event,event.Repeat==='Daily'?today():event.StartDate,event.Repeat==='Daily'?today():addDays(today(),lead),lunar))if(!convertedOccurrence(next.State,event.Id,date)&&!next.State.Tasks.some(task=>task.EventId===event.Id&&(event.Repeat==='None'||task.OccurrenceDate===date))){
+   next.State.Tasks.push({Id:(await digest(`${event.Id}:${date}`)).slice(0,32).toLowerCase(),EventId:event.Id,OccurrenceDate:date,ScheduledDate:date,OriginalScheduledDate:date,Title:event.Title,Notes:event.Notes,ImageIds:[...event.ImageIds],EventImportance:event.Importance,IsImportant:!!event.IsImportant,Color:event.Color||'None',ColorOverride:false,HasOverride:false,State:'Open',CreatedAt:new Date().toISOString(),CompletedOn:null,ArchiveReason:''});changed=true;
   }
  }
  if(!changed)return false;next.Revision=(next.Revision||0)+1;
  });
 }
 export function canonical(value){
+ if(value&&typeof value==='object'&&!Array.isArray(value)){
+  if('ImageIds'in value&&'Title'in value)value={Color:'None',...value};
+  if('OriginalScheduledDate'in value)value={ConversionSources:[],CompletedOrigin:null,ColorOverride:false,...value};
+  if('NormalDays'in value)value={TaskColorNames:['本时段要做','专注处理','零碎处理','待沟通','稍后安排'],...value};
+ }
  if(Array.isArray(value))return '['+value.map(canonical).join(',')+']';
  if(value&&typeof value==='object')return '{'+Object.keys(value).filter(key=>value[key]!==undefined).sort().map(key=>{let item=value[key];if(['CreatedAt','At'].includes(key)&&typeof item==='string'&&!Number.isNaN(Date.parse(item)))item=new Date(item).toISOString();return JSON.stringify(key)+':'+canonical(item);}).join(',')+'}';
  return JSON.stringify(value);
@@ -118,14 +134,14 @@ function taskRow(task){
  if(task.ImageIds.length){const images=node('div',{class:'task-images'});content.append(images);for(const id of task.ImageIds){const owner=profile.Id;void get('images',`${owner}/${id}`).then(blob=>{if(!blob||!images.isConnected)return;const url=URL.createObjectURL(blob);objectUrls.push(url);images.append(node('img',{src:url,alt:'备注图片',onclick:()=>preview(blob)}));});}}
  card.append(content,btn(task.IsImportant?'★':'☆',()=>edit(state=>{const t=state.Tasks.find(t=>t.Id===task.Id);t.IsImportant=!t.IsImportant;}),'star'));return card;
 }
-function snapshot(state,task,kind,day=today()){state.Activities.push({Id:uuid(),TaskId:task.Id,Kind:kind,Day:day,At:new Date().toISOString(),Title:task.Title,Notes:task.Notes,ImageIds:[...task.ImageIds],ScheduledDate:task.ScheduledDate,IsImportant:task.IsImportant,Reverted:false});}
+function snapshot(state,task,kind,day=today()){state.Activities.push({Id:uuid(),TaskId:task.Id,Kind:kind,Day:day,At:new Date().toISOString(),Title:task.Title,Notes:task.Notes,ImageIds:[...task.ImageIds],ScheduledDate:task.ScheduledDate,IsImportant:task.IsImportant,Color:task.Color||'None',Reverted:false});}
 export function endLongTerm(state,id,day=today()){
  const selected=state.Tasks.find(t=>t.Id===id),event=state.Events.find(e=>e.Id===selected?.EventId&&e.Repeat==='Daily');
  if(!event)throw new Error('这不是长期任务。');if(event.EndDate&&event.EndDate<day)return;event.EndDate=addDays(day,-1);
  for(const task of state.Tasks.filter(t=>t.EventId===event.Id&&t.State==='Open'&&t.ScheduledDate>=day)){task.State='Cancelled';task.ArchiveReason='长期任务已结束';snapshot(state,task,'Cancelled',day);}
  snapshot(state,selected,'Ended',day);
 }
-async function toggle(id){await edit(state=>{const task=state.Tasks.find(task=>task.Id===id);if(task.State==='Cancelled')return;if(task.State==='Completed'){task.State='Open';task.CompletedOn=null;for(const activity of state.Activities.filter(a=>a.TaskId===id&&a.Kind==='Completed'))activity.Reverted=true;}else{task.State='Completed';task.CompletedOn=today();snapshot(state,task,'Completed');}});}
+async function toggle(id){await edit(state=>{const task=state.Tasks.find(task=>task.Id===id);if(task.State==='Cancelled')return;if(task.State==='Completed'){task.State='Open';task.CompletedOn=null;task.CompletedOrigin=null;for(const activity of state.Activities.filter(a=>a.TaskId===id&&a.Kind==='Completed'))activity.Reverted=true;}else{task.State='Completed';task.CompletedOn=today();task.CompletedOrigin=completionOrigin(state,task);snapshot(state,task,'Completed');}});}
 function render(){
  for(const url of objectUrls)URL.revokeObjectURL(url);objectUrls=[];
  const root=$('#app');root.replaceChildren(node('header',{class:'top'},node('a',{class:'brand',href:'./'},'E²',node('span',{},'Day')),node('span',{class:'edition'},'探索每一天')));

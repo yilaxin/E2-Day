@@ -63,6 +63,7 @@ public partial class MainWindow
     {
         var kind = record.Kind switch { ActivityKind.Completed => "完成任务", ActivityKind.Viewed => "看过提醒", ActivityKind.Ended => "结束长期任务", _ => "取消归档" };
         var heading = Ui.Row(Ui.Badge(kind, record.Kind == ActivityKind.Completed), Ui.Text($"{record.Day:M/d}  {record.At.ToLocalTime():HH:mm}", 10, Ui.Muted));
+        if (record.Color != TaskColor.None) heading.Children.Add(ColorStyle.Badge(_service.State.Settings, record.Color));
         var title = Ui.Text((record.IsImportant ? "★ " : "") + record.Title, 13, bold: record.IsImportant); title.Margin = new Thickness(0, 9, 0, 5);
         var panel = Ui.Stack(heading, title, Ui.Text($"当时原定日期：{record.ScheduledDate:yyyy-MM-dd}", 10, Ui.Muted));
         if (record.Notes.Length > 0) { var note = Ui.Text(record.Notes, 11, Ui.Muted); note.Margin = new Thickness(0, 6, 0, 0); panel.Children.Add(note); }
@@ -75,6 +76,7 @@ public partial class MainWindow
         Header("让工具适合你的习惯", "偏好设置", "记录保存在这台电脑上，任务和日历可离线使用。");
         BuildAccountSettings();
         BuildFileExchange();
+        BuildTaskColorSettings();
         var normal = new TextBox { Text = _service.State.Settings.NormalDays.ToString(), Width = 90 };
         var important = new TextBox { Text = _service.State.Settings.ImportantDays.ToString(), Width = 90 };
         var very = new TextBox { Text = _service.State.Settings.VeryImportantDays.ToString(), Width = 90 };

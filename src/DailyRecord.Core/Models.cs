@@ -7,6 +7,8 @@ public enum EventImportance { Normal, Important, VeryImportant }
 public enum RepeatRule { None, Weekly, Monthly, Yearly, LunarYearly, Daily }
 public enum TaskState { Open, Completed, Cancelled }
 public enum EditScope { ThisOccurrence, ThisAndFuture }
+public enum ItemKind { Task, Event, LongTerm }
+public enum TaskColor { None, Blue, Purple, Teal, Pink, Gray }
 public enum ActivityKind { Viewed, Completed, Cancelled, Ended }
 
 public interface IClock
@@ -23,6 +25,7 @@ public sealed class SystemClock : IClock
 
 public sealed class EventDefinition
 {
+    public TaskColor Color { get; set; }
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Title { get; set; } = "";
     public string Notes { get; set; } = "";
@@ -38,6 +41,8 @@ public sealed class EventDefinition
 
 public sealed class TaskItem
 {
+    public TaskColor Color { get; set; }
+    public bool ColorOverride { get; set; }
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string? EventId { get; set; }
     public DateOnly? OccurrenceDate { get; set; }
@@ -53,11 +58,17 @@ public sealed class TaskItem
     public DateTimeOffset CreatedAt { get; set; }
     public DateOnly? CompletedOn { get; set; }
     public string ArchiveReason { get; set; } = "";
+    public List<OccurrenceLink> ConversionSources { get; set; } = [];
+    public CompletionOrigin? CompletedOrigin { get; set; }
     [JsonIgnore] public bool IsEvent => EventId is not null;
 }
 
+public sealed record OccurrenceLink(string EventId, DateOnly Day);
+public sealed record CompletionOrigin(string? EventId, DateOnly? Day, RepeatRule Repeat);
+
 public sealed class ActivityRecord
 {
+    public TaskColor Color { get; set; }
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string TaskId { get; set; } = "";
     public ActivityKind Kind { get; set; }
@@ -73,6 +84,7 @@ public sealed class ActivityRecord
 
 public sealed class UserSettings
 {
+    public List<string> TaskColorNames { get; set; } = [.. TaskColors.DefaultNames];
     public int NormalDays { get; set; }
     public int ImportantDays { get; set; } = 3;
     public int VeryImportantDays { get; set; } = 7;
@@ -150,7 +162,13 @@ public static class StateJson
         var tasks = state.Tasks.Select(t => t.Id).ToHashSet();
         foreach (var task in state.Tasks)
         {
+            if (!Enum.IsDefined(task.Color)) throw new InvalidDataException("任务分类颜色无效。");
             NoteImage.ValidateIds(task.ImageIds);
+            if (task.ConversionSources is null || task.ConversionSources.Any(s => s is null || !events.Contains(s.EventId) || !ValidDate(s.Day)) ||
+                task.ConversionSources.Distinct().Count() != task.ConversionSources.Count ||
+                task.CompletedOrigin is { } origin && (!Enum.IsDefined(origin.Repeat) || origin.EventId is not null && !events.Contains(origin.EventId) ||
+                    origin.Day is { } originDay && !ValidDate(originDay) || origin.Repeat == RepeatRule.Daily && (origin.EventId is null || origin.Day is null)))
+                throw new InvalidDataException("事项转换来源或完成归属无效。");
             if (string.IsNullOrWhiteSpace(task.Id) || string.IsNullOrWhiteSpace(task.Title) || task.Notes is null ||
                 !ValidDate(task.ScheduledDate) || !ValidDate(task.OriginalScheduledDate) ||
                 task.OccurrenceDate is { } occurrence && !ValidDate(occurrence) ||
@@ -160,8 +178,12 @@ public static class StateJson
                 task.State == TaskState.Completed && task.CompletedOn is null)
                 throw new InvalidDataException("任务数据不完整。");
         }
+        var sources = state.Tasks.SelectMany(t => t.ConversionSources).ToArray();
+        if (sources.Distinct().Count() != sources.Length || sources.Any(s => state.Tasks.Any(t => t.EventId == s.EventId && t.OccurrenceDate == s.Day)))
+            throw new InvalidDataException("已转换的安排与原重复安排冲突，请使用新版客户端交换并保留一致的事项版本。");
         foreach (var ev in state.Events)
         {
+            if (!Enum.IsDefined(ev.Color)) throw new InvalidDataException("事件分类颜色无效。");
             NoteImage.ValidateIds(ev.ImageIds);
             if (string.IsNullOrWhiteSpace(ev.Id) || string.IsNullOrWhiteSpace(ev.Title) || ev.Notes is null || !ValidDate(ev.StartDate) ||
                 !Enum.IsDefined(ev.Repeat) || !Enum.IsDefined(ev.Importance) ||
@@ -173,7 +195,12 @@ public static class StateJson
         if (state.Activities.Any(a => !tasks.Contains(a.TaskId) || !Enum.IsDefined(a.Kind) ||
             string.IsNullOrWhiteSpace(a.Title) || a.Notes is null || !ValidDate(a.Day) || !ValidDate(a.ScheduledDate)))
             throw new InvalidDataException("历史记录缺少对应任务。");
-        foreach (var activity in state.Activities) NoteImage.ValidateIds(activity.ImageIds);
+        foreach (var activity in state.Activities)
+        {
+            NoteImage.ValidateIds(activity.ImageIds);
+            if (!Enum.IsDefined(activity.Color)) throw new InvalidDataException("历史分类颜色无效。");
+        }
+        TaskColors.ValidateNames(state.Settings.TaskColorNames);
         if (state.News.Articles.Any(a => string.IsNullOrWhiteSpace(a.Title) || a.Summary is null ||
             a.Url is null || a.Source is null || a.Language is null))
             throw new InvalidDataException("资讯缓存数据无效。");

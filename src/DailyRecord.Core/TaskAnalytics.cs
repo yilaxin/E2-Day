@@ -15,7 +15,7 @@ public sealed class HabitAnalytics
     internal HabitAnalytics(EventDefinition definition, IEnumerable<CompletionEntry> completions, DateOnly today)
     {
         Definition = definition;
-        CompletedDays = completions.GroupBy(c => c.Task.OccurrenceDate ?? c.Task.ScheduledDate)
+        CompletedDays = completions.GroupBy(c => c.Task.CompletedOrigin?.Day ?? c.Task.OccurrenceDate ?? c.Task.ScheduledDate)
             .ToDictionary(g => g.Key, g => (IReadOnlyList<TaskItem>)g.Select(c => c.Task).ToArray());
         // Early completions remain visible in the calendar, but do not lengthen a streak into the future.
         var dates = CompletedDays.Keys.Where(d => d <= today).Order().ToArray();
@@ -25,7 +25,7 @@ public sealed class HabitAnalytics
             run = previous is { } prior && day.DayNumber == prior.DayNumber + 1 ? run + 1 : 1;
             LongestStreak = Math.Max(LongestStreak, run); previous = day;
         }
-        Ended = definition.EndDate < today;
+        Ended = definition.EndDate < today || definition.EndDate < definition.StartDate;
         if (!Ended && definition.StartDate <= today)
         {
             var anchor = CompletedDays.ContainsKey(today) ? today : today.AddDays(-1);
@@ -74,7 +74,9 @@ public sealed class TaskAnalytics
             Group("4-7", "逾期 4–7 天", age => age is >= 4 and <= 7), Group("8+", "逾期超过 7 天", age => age >= 8)];
         BacklogGroup Group(string key, string label, Func<int, bool> matches) =>
             new(key, label, due.Where(t => matches(today.DayNumber - t.ScheduledDate.DayNumber)).ToArray());
-        var dailyCompletions = Completions.Where(c => c.Task.EventId is not null).ToLookup(c => c.Task.EventId!);
+        var dailyCompletions = Completions.Where(c => c.Task.CompletedOrigin is { Repeat: RepeatRule.Daily } ||
+                c.Task.CompletedOrigin is null && c.Task.EventId is not null)
+            .ToLookup(c => c.Task.CompletedOrigin?.EventId ?? c.Task.EventId!);
         Habits = state.Events.Where(e => e.Repeat == RepeatRule.Daily)
             .Select(e => new HabitAnalytics(e, dailyCompletions[e.Id], today))
             .OrderBy(h => h.Ended).ThenBy(h => h.Definition.StartDate > today).ThenBy(h => h.Definition.Title).ToArray();

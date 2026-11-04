@@ -15,6 +15,8 @@ internal static partial class SmokeTest
     {
         Directory.CreateDirectory(outputDirectory);
         await VerifyMemoryResources(window, service, outputDirectory);
+        VerifyItemConversions(window, service, clock, outputDirectory);
+        await VerifyTaskColors(window, service, holidays, clock, outputDirectory);
         await VerifyPageResourceLifecycle(outputDirectory);
         await StartupSmokeTest.Run(outputDirectory);
         VerifyAccountFlow(outputDirectory);
