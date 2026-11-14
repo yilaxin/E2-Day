@@ -1,4 +1,4 @@
-const CACHE='e2day-mobile-2.1.13-task-colors';
+const CACHE='e2day-mobile-2.1.14-quick-colors';
 const SHELL=['./','./index.html','./app.js','./app.css','./manifest.webmanifest','./icon.svg','./icon-192.png','./icon-512.png','./lunar-dates.json'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('e2day-mobile-')&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));

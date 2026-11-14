@@ -43,6 +43,7 @@ public sealed class TaskItem
 {
     public TaskColor Color { get; set; }
     public bool ColorOverride { get; set; }
+    public QuickColorRestore? QuickColorRestore { get; set; }
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string? EventId { get; set; }
     public DateOnly? OccurrenceDate { get; set; }
@@ -65,6 +66,7 @@ public sealed class TaskItem
 
 public sealed record OccurrenceLink(string EventId, DateOnly Day);
 public sealed record CompletionOrigin(string? EventId, DateOnly? Day, RepeatRule Repeat);
+public sealed record QuickColorRestore(TaskColor AppliedColor, TaskColor PreviousColor, bool PreviousOverride);
 
 public sealed class ActivityRecord
 {
@@ -84,6 +86,7 @@ public sealed class ActivityRecord
 
 public sealed class UserSettings
 {
+    public TaskColor QuickTaskColor { get; set; } = TaskColor.Blue;
     public List<string> TaskColorNames { get; set; } = [.. TaskColors.DefaultNames];
     public int NormalDays { get; set; }
     public int ImportantDays { get; set; } = 3;
@@ -162,7 +165,9 @@ public static class StateJson
         var tasks = state.Tasks.Select(t => t.Id).ToHashSet();
         foreach (var task in state.Tasks)
         {
-            if (!Enum.IsDefined(task.Color)) throw new InvalidDataException("任务分类颜色无效。");
+            if (!Enum.IsDefined(task.Color) || task.QuickColorRestore is { } restore &&
+                (!Enum.IsDefined(restore.AppliedColor) || restore.AppliedColor == TaskColor.None || !Enum.IsDefined(restore.PreviousColor)))
+                throw new InvalidDataException("任务分类颜色或恢复信息无效。");
             NoteImage.ValidateIds(task.ImageIds);
             if (task.ConversionSources is null || task.ConversionSources.Any(s => s is null || !events.Contains(s.EventId) || !ValidDate(s.Day)) ||
                 task.ConversionSources.Distinct().Count() != task.ConversionSources.Count ||
@@ -201,6 +206,8 @@ public static class StateJson
             if (!Enum.IsDefined(activity.Color)) throw new InvalidDataException("历史分类颜色无效。");
         }
         TaskColors.ValidateNames(state.Settings.TaskColorNames);
+        if (!Enum.IsDefined(state.Settings.QuickTaskColor) || state.Settings.QuickTaskColor == TaskColor.None)
+            throw new InvalidDataException("快捷颜色必须是五种分类颜色之一。");
         if (state.News.Articles.Any(a => string.IsNullOrWhiteSpace(a.Title) || a.Summary is null ||
             a.Url is null || a.Source is null || a.Language is null))
             throw new InvalidDataException("资讯缓存数据无效。");

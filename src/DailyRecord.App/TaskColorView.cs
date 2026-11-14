@@ -64,7 +64,7 @@ public partial class MainWindow
     {
         var dialog = new ColorNamesDialog(this, _service.State.Settings);
         if ((ColorNamesPresenter is { } show ? show(dialog) : dialog.ShowDialog()) == true)
-            Run(() => _service.RenameTaskColors(dialog.Names));
+            RunColorChange(() => _service.RenameTaskColors(dialog.Names));
     }
     private void ClearColorSelection() { _colorSelectedIds.Clear(); _colorSelecting = false; _colorSelectionCaption = null; }
     private void UpdateColorSelectionCaption()
@@ -115,6 +115,7 @@ public partial class MainWindow
         var batch = Ui.Button(_colorSelecting ? "退出批量" : "批量着色", () => { _colorSelecting = !_colorSelecting; _colorSelectedIds.Clear(); RefreshPage(); });
         batch.Tag = "color-batch-toggle"; actions.Children.Add(batch);
         var names = Ui.Button("分类名称", EditColorNames, quiet: true); names.Tag = "color-names"; actions.Children.Add(names);
+        actions.Children.Add(QuickColorSetting("quick-color-setting"));
         if (_colorSelecting)
         {
             var visible = today.Where(t => _taskColorFilter is null || t.Color == _taskColorFilter).ToList();
@@ -125,7 +126,7 @@ public partial class MainWindow
             var apply = Ui.Button("为所选着色 ▾", () => { }); apply.Tag = "color-batch-apply";
             apply.IsEnabled = _colorSelectedIds.Count > 0;
             // Checkbox changes update this button without rebuilding the page or interrupting scrolling.
-            var menu = new ContextMenu(); var options = ColorMenu((color, _) => Run(() =>
+            var menu = new ContextMenu(); var options = ColorMenu((color, _) => RunColorChange(() =>
             {
                 _service.SetTaskColors(_service.State.Tasks.Where(t => _colorSelectedIds.Contains(t.Id)), color);
                 _colorSelectedIds.Clear();
@@ -160,6 +161,7 @@ public partial class MainWindow
         var chips = new WrapPanel { Margin = new Thickness(0, 12, 0, 12) };
         foreach (var color in Enum.GetValues<TaskColor>().Where(c => c != TaskColor.None)) chips.Children.Add(ColorStyle.Badge(_service.State.Settings, color));
         panel.Children.Add(chips); var edit = Ui.Button("修改分类名称", EditColorNames); edit.Tag = "settings-color-names"; panel.Children.Add(edit);
+        panel.Children.Add(QuickColorSetting("settings-quick-color"));
         PageBody.Children.Add(GlassCardBorder.Create(panel));
     }
 }

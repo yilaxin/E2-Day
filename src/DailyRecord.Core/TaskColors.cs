@@ -14,6 +14,36 @@ public static class TaskColors
 
 public sealed partial class TaskService
 {
+    public void SetQuickTaskColor(TaskColor color)
+    {
+        if (!Enum.IsDefined(color) || color == TaskColor.None) throw new ArgumentException("请选择一种快捷分类颜色。");
+        if (State.Settings.QuickTaskColor == color) return;
+        State.Settings.QuickTaskColor = color; Save();
+    }
+
+    public TaskColor QuickColorDestination(TaskItem task) => task.Color != State.Settings.QuickTaskColor ? State.Settings.QuickTaskColor :
+        task.QuickColorRestore is { } restore && restore.AppliedColor == task.Color ? restore.PreviousColor : TaskColor.None;
+
+    public void ToggleQuickTaskColor(TaskItem task)
+    {
+        if (!State.Tasks.Contains(task)) throw new ArgumentException("事项已变化，请重新打开。");
+        var quick = State.Settings.QuickTaskColor;
+        if (task.Color == quick)
+        {
+            var previous = task.QuickColorRestore;
+            task.Color = QuickColorDestination(task);
+            task.ColorOverride = previous?.AppliedColor == quick ? previous.PreviousOverride : task.IsEvent;
+            // If the series default changed while temporarily highlighted, keep the restored color local.
+            if (Definition(task) is { } ev && ev.Color != task.Color) task.ColorOverride = true;
+            task.QuickColorRestore = null;
+        }
+        else
+        {
+            task.QuickColorRestore = new(quick, task.Color, task.ColorOverride);
+            task.Color = quick; task.ColorOverride = task.IsEvent;
+        }
+        Save();
+    }
     // The same source set drives the on-screen counts, filter and classified share image.
     public IReadOnlyList<TaskItem> TodayColorTasks() => Sort(VisibleOpen(Today).Concat(State.Tasks.Where(t =>
         t.State == TaskState.Completed && t.CompletedOn == Today))).ToList();
@@ -34,8 +64,8 @@ public sealed partial class TaskService
         var changed = false;
         void Set(TaskItem task, bool overridden)
         {
-            if (task.Color == color && task.ColorOverride == overridden) return;
-            task.Color = color; task.ColorOverride = overridden; changed = true;
+            if (task.Color == color && task.ColorOverride == overridden && task.QuickColorRestore is null) return;
+            task.Color = color; task.ColorOverride = overridden; task.QuickColorRestore = null; changed = true;
         }
         foreach (var task in selected)
         {

@@ -33,6 +33,10 @@ Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese
 
 **新增鸿蒙原生版 0.1.1**：独立 ArkTS / ArkUI 应用，手机本机账号、离线任务与备注图片，手动与电脑交换 JSON。已在 Pura 70 / HarmonyOS 6.1 验证。公开构建为未签名 HAP，需用自己的开发者账号和设备签名；个人设备签名包不公开。[构建、签名及日常使用](docs/HARMONY-NATIVE.md)。既有网页手机入口继续使用。
 
+**任务行一键着色（2.1.14）**：星标旁的颜色圆点左键直接加入快捷分类，再点恢复原色；右键第一层选五色和未分类。快捷色按账号保存，操作后保留滚动位置，并提供短暂撤销。
+
+![任务行快捷着色（隔离样例）](docs/images/quick-colors-task-row.png)
+
 **五色任务分类（Windows 2.1.13）**：五种颜色可改名，支持单项／批量着色、按色筛选及未完成数量，当前分类可复制为图片。重要星标、完成淡化、备注原图和历史继续保留。
 
 ![任务颜色分类（隔离样例）](docs/images/task-colors-today.png)
@@ -61,12 +65,12 @@ Windows desktop task planner, yearly/monthly calendar, recurring events, Chinese
 
 ## 下载与开始使用
 
-Windows 日常版：**2.1.13**，新增五色任务分类、批量着色、筛选计数与分类分享，保留原粉紫玻璃风格、硬件加速、统一平滑滚动、自定义热力图区间、统计分享、任务与图文备注，以及约 3.2 秒的大窗口开场。鸿蒙原生版仍为 0.1.1。下方提供对应 Windows 程序包。程序采用免安装、自包含的文件夹发布方式，下载包内已包含所需的 .NET 运行依赖。
+Windows 日常版：**2.1.14**，新增任务行一键着色、右键直达选色、快捷色偏好及原色恢复，保留原粉紫玻璃风格、硬件加速、统一平滑滚动、自定义热力图区间、统计分享、任务与图文备注，以及约 3.2 秒的大窗口开场。鸿蒙原生版仍为 0.1.1。下方提供对应 Windows 程序包。程序采用免安装、自包含的文件夹发布方式，下载包内已包含所需的 .NET 运行依赖。
 
 | 你的电脑 | 下载文件 |
 | --- | --- |
-| Intel / AMD 处理器的 64 位 Windows 电脑 | [E2-Day-v2.1.13-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.13/E2-Day-v2.1.13-win-x64.zip) |
-| Snapdragon 等 ARM 处理器的 Windows ARM64 电脑 | [E2-Day-v2.1.13-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.13/E2-Day-v2.1.13-win-arm64.zip) |
+| Intel / AMD 处理器的 64 位 Windows 电脑 | [E2-Day-v2.1.14-win-x64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.14/E2-Day-v2.1.14-win-x64.zip) |
+| Snapdragon 等 ARM 处理器的 Windows ARM64 电脑 | [E2-Day-v2.1.14-win-arm64.zip](https://github.com/yilaxin/E2-Day/releases/download/v2.1.14/E2-Day-v2.1.14-win-arm64.zip) |
 
 1. 在 Windows“设置 → 系统 → 关于 → 系统类型”中确认电脑架构，选择对应下载包。
 2. **完整解压**到一个固定文件夹，保留程序旁边的 DLL、图标和 `Data` 文件夹。

@@ -55,14 +55,17 @@ public static class SyncMerge
                 {
                     var merged = co.DeepClone().AsObject();
                     // These fields describe one state transition and must never be merged independently.
-                    var grouped = collection == "Tasks" ? new[] { "State", "CompletedOn", "ArchiveReason", "CompletedOrigin" } : [];
+                    var groups = collection == "Tasks" ? new[] {
+                        (Name: "Status", Keys: new[] { "State", "CompletedOn", "ArchiveReason", "CompletedOrigin" }),
+                        (Name: "ColorClassification", Keys: new[] { "Color", "ColorOverride", "QuickColorRestore" }) } : [];
+                    var grouped = groups.SelectMany(g => g.Keys).ToArray();
                     foreach (var key in co.Select(k => k.Key).Concat(po.Select(k => k.Key)).Distinct().Where(k => !grouped.Contains(k)))
                         merged[key] = MergeValue(collection, id, key, bo[key], co[key], po[key], conflicts, metadata?.Touched(collection, id, key, baseVersion) ?? false);
-                    if (grouped.Length > 0)
+                    foreach (var group in groups)
                     {
-                        JsonObject Group(JsonObject o) { var x = new JsonObject(); foreach (var key in grouped) x[key] = o[key]?.DeepClone(); return x; }
-                        var choice = MergeValue(collection, id, "Status", Group(bo), Group(co), Group(po), conflicts, metadata?.Touched(collection, id, "Status", baseVersion) ?? false)!.AsObject();
-                        foreach (var key in grouped) merged[key] = choice[key]?.DeepClone();
+                        JsonObject Group(JsonObject o) { var x = new JsonObject(); foreach (var key in group.Keys) x[key] = o[key]?.DeepClone(); return x; }
+                        var choice = MergeValue(collection, id, group.Name, Group(bo), Group(co), Group(po), conflicts, metadata?.Touched(collection, id, group.Name, baseVersion) ?? false)!.AsObject();
+                        foreach (var key in group.Keys) merged[key] = choice[key]?.DeepClone();
                     }
                     value = merged;
                 }

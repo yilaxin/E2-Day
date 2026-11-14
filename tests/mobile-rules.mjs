@@ -31,6 +31,16 @@ if(process.argv[2]){
  invalidTime.Tasks[0].CreatedAt='2026-10-14';assert.throws(()=>validateMobileState(invalidTime));
  state.Tasks[0].ScheduledDate='2026-02-30';assert.throws(()=>validateMobileState(state));
  console.log('PASS portable backup: desktop hash matches browser implementation, PNG references preserved, invalid dates rejected before restore');
+ const quickFile=path.join(path.dirname(process.argv[2]),'quick-color-sample.json');
+ if(fs.existsSync(quickFile)){
+  const backup=JSON.parse(fs.readFileSync(quickFile,'utf8'));assert.equal(await portableHash(backup),backup.Sha256);
+  const data=validateMobileState(JSON.parse(backup.Payload));assert.equal(data.Settings.QuickTaskColor,'Blue');
+  assert.deepEqual(data.Tasks[0].QuickColorRestore,{AppliedColor:'Blue',PreviousColor:'Purple',PreviousOverride:false});
+  const round=resolveImport(previewImport(data,structuredClone(data)),{});assert.deepEqual(round.Tasks[0].QuickColorRestore,data.Tasks[0].QuickColorRestore);
+  const bad=structuredClone(data);bad.Tasks[0].QuickColorRestore.AppliedColor='None';assert.throws(()=>validateMobileState(bad));
+  bad.Tasks[0].QuickColorRestore=null;bad.Settings.QuickTaskColor='None';assert.throws(()=>validateMobileState(bad));
+  console.log('PASS quick-color restore metadata, custom preference, portable hash, file roundtrip and invalid metadata rejection');
+ }
  const colorFile=path.join(path.dirname(process.argv[2]),'color-sample.json');
  if(fs.existsSync(colorFile)){
   const colorBackup=JSON.parse(fs.readFileSync(colorFile,'utf8'));assert.equal(await portableHash(colorBackup),colorBackup.Sha256);

@@ -17,6 +17,7 @@ internal static partial class SmokeTest
         await VerifyMemoryResources(window, service, outputDirectory);
         VerifyItemConversions(window, service, clock, outputDirectory);
         await VerifyTaskColors(window, service, holidays, clock, outputDirectory);
+        await VerifyQuickTaskColors(holidays, outputDirectory);
         await VerifyPageResourceLifecycle(outputDirectory);
         await StartupSmokeTest.Run(outputDirectory);
         VerifyAccountFlow(outputDirectory);

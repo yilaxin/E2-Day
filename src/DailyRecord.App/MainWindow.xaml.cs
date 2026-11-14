@@ -59,10 +59,14 @@ public partial class MainWindow : Window
             Height = Math.Max(MinHeight, Math.Min(940, SystemParameters.WorkArea.Height - 48));
         }
         _wide = Width >= 1240;
+        PreviewMouseDown += (_, _) => _colorScrollVersion++;
+        PreviewMouseWheel += (_, _) => _colorScrollVersion++;
+        PreviewKeyDown += (_, _) => _colorScrollVersion++;
         Closed += (_, _) =>
         {
             _pageScroll.Dispose(); _calendarScroll.Dispose(); _monthScroll.Dispose();
             ReleasePageResources();
+            DisposeColorNotice();
             ClearColorSelection(); _colorBatchButton = null;
             _noteThumbnails.Clear(); _dayTimer.Stop(); _lifetime.Cancel();
             if (_initialized) _service.Changed -= UpdateSaveStatus;
@@ -114,6 +118,7 @@ public partial class MainWindow : Window
 
     public void Navigate(PageKind page)
     {
+        HideColorNotice(); _colorScrollVersion++;
         StopPageScrolling();
         RememberDraft(); if (page != PageKind.Today) ClearColorSelection(); _page = page; _selectedMonth = null;
         if (page == PageKind.Year) CalendarScroller.ScrollToTop(); else PageScroller.ScrollToTop();
@@ -299,6 +304,7 @@ public partial class MainWindow : Window
         if (task.ImageIds.Count > 0) left.Children.Add(NoteGallery(task.ImageIds));
         content.Children.Add(left);
         var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Top };
+        actions.Children.Add(QuickTaskColorButton(task, refresh));
         var star = Ui.Button(task.IsImportant ? "★" : "☆", () => Run(() => _service.ToggleImportant(task), refresh), quiet: true);
         star.Tag = "important:" + task.Id; star.Foreground = task.IsImportant ? Ui.Amber : Ui.Muted;
         star.FontSize = 19; star.Padding = new Thickness(5, 4, 5, 4); star.ToolTip = task.IsImportant ? "取消重要标记" : "标记为重要任务";
@@ -337,7 +343,7 @@ public partial class MainWindow : Window
         }
         AddTypeActions();
         menu.Items.Add(new Separator());
-        menu.Items.Add(ColorMenu((color, scope) => Run(() => _service.SetTaskColors([task], color, scope), refresh), task.Id,
+        menu.Items.Add(ColorMenu((color, scope) => ChangeTaskColor(task, () => _service.SetTaskColors([task], color, scope), refresh, scope == EditScope.ThisOccurrence), task.Id,
             task.IsEvent && _service.State.Events.Any(e => e.Id == task.EventId && e.Repeat != RepeatRule.None)));
         if (task.State != TaskState.Cancelled)
         {

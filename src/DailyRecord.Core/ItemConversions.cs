@@ -51,6 +51,7 @@ public sealed partial class TaskService
         }
         selected.Title = title.Trim(); selected.Notes = notes.Trim(); selected.ImageIds = [.. ids]; selected.IsImportant = important;
         selected.Color = color ?? selected.Color;
+        selected.QuickColorRestore = null;
         selected.EventId = replacement?.Id; selected.OccurrenceDate = replacement?.StartDate;
         selected.ScheduledDate = replacement?.StartDate ?? date; selected.EventImportance = replacement?.Importance ?? EventImportance.Normal;
         selected.HasOverride = false;

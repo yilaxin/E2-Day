@@ -26,6 +26,9 @@ export function validateMobileState(state){
  const names=state.Settings.TaskColorNames;
  if(names!==undefined&&(!Array.isArray(names)||names.length!==5||names.some(n=>typeof n!=='string'||!n.trim()||n!==n.trim()||n.length>12||/[\u0000-\u001f\u007f-\u009f]/.test(n)||['全部','未分类'].includes(n))||new Set(names.map(n=>n.toLowerCase())).size!==5))fail();
  if(state.Tasks.some(t=>t?.ColorOverride!==undefined&&typeof t.ColorOverride!=='boolean'))fail();
+ const colors=['None','Blue','Purple','Teal','Pink','Gray'];
+ if(state.Settings.QuickTaskColor!==undefined&&(!colors.includes(state.Settings.QuickTaskColor)||state.Settings.QuickTaskColor==='None'))fail();
+ for(const task of state.Tasks){const restore=task?.QuickColorRestore;if(restore!=null&&(!colors.includes(restore.AppliedColor)||restore.AppliedColor==='None'||!colors.includes(restore.PreviousColor)||typeof restore.PreviousOverride!=='boolean'))fail();}
  for(const collection of [state.Tasks,state.Events,state.Activities])if(collection.some(row=>!row||typeof row.Id!=='string'||!row.Id)||new Set(collection.map(row=>row.Id)).size!==collection.length)fail();
  for(const row of records)if(typeof row.Title!=='string'||!row.Title.trim()||typeof row.Notes!=='string'||!Array.isArray(row.ImageIds)||row.ImageIds.length>8||new Set(row.ImageIds).size!==row.ImageIds.length||row.ImageIds.some(id=>typeof id!=='string'||! /^[A-F0-9]{64}$/.test(id)))fail();
  const events=new Set(state.Events.map(row=>row.Id)),tasks=new Set(state.Tasks.map(row=>row.Id)),occurrencesSeen=new Set();
@@ -98,8 +101,8 @@ async function ensureUpcoming(){
 export function canonical(value){
  if(value&&typeof value==='object'&&!Array.isArray(value)){
   if('ImageIds'in value&&'Title'in value)value={Color:'None',...value};
-  if('OriginalScheduledDate'in value)value={ConversionSources:[],CompletedOrigin:null,ColorOverride:false,...value};
-  if('NormalDays'in value)value={TaskColorNames:['本时段要做','专注处理','零碎处理','待沟通','稍后安排'],...value};
+  if('OriginalScheduledDate'in value)value={ConversionSources:[],CompletedOrigin:null,ColorOverride:false,QuickColorRestore:null,...value};
+  if('NormalDays'in value)value={TaskColorNames:['本时段要做','专注处理','零碎处理','待沟通','稍后安排'],QuickTaskColor:'Blue',...value};
  }
  if(Array.isArray(value))return '['+value.map(canonical).join(',')+']';
  if(value&&typeof value==='object')return '{'+Object.keys(value).filter(key=>value[key]!==undefined).sort().map(key=>{let item=value[key];if(['CreatedAt','At'].includes(key)&&typeof item==='string'&&!Number.isNaN(Date.parse(item)))item=new Date(item).toISOString();return JSON.stringify(key)+':'+canonical(item);}).join(',')+'}';
