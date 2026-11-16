@@ -302,8 +302,11 @@ public sealed partial class TaskService
         return actual;
     }
 
-    public IReadOnlyDictionary<DateOnly, CalendarDaySummary> CalendarForYear(int year)
+    public IReadOnlyDictionary<DateOnly, CalendarDaySummary> CalendarForYear(int year, CalendarViewMode mode = CalendarViewMode.All)
     {
+        if (!Enum.IsDefined(mode)) throw new ArgumentException("日历视图无效。");
+        if (mode == CalendarViewMode.Plain) return new Dictionary<DateOnly, CalendarDaySummary>();
+        var longTerms = State.Events.Where(e => e.Repeat == RepeatRule.Daily).Select(e => e.Id).ToHashSet();
         var excluded = State.Tasks.SelectMany(t => t.ConversionSources).ToLookup(s => s.EventId, s => s.Day);
         var from = new DateOnly(year, 1, 1);
         var to = new DateOnly(year, 12, 31);
@@ -323,13 +326,16 @@ public sealed partial class TaskService
                 existingEvents.Add(eventId);
                 existingOccurrences.Add((eventId, task.OccurrenceDate));
             }
-            if (task.ScheduledDate.Year != year || task.State == TaskState.Cancelled) continue;
+            if (task.ScheduledDate.Year != year || task.State == TaskState.Cancelled ||
+                mode == CalendarViewMode.HideLongTerm && task.EventId is { } dailyId && longTerms.Contains(dailyId)) continue;
             var day = Day(task.ScheduledDate);
             day.Count++; day.RecordedCount++; day.Important |= task.IsImportant;
             day.Tasks.Add(new(task.Title, task.IsImportant, task.State, task.IsEvent, task.EventImportance));
             if (task.IsEvent) day.Titles.Add((task.State == TaskState.Completed ? "✓ " + task.Title : task.Title, task.EventImportance));
         }
         foreach (var ev in State.Events)
+        {
+            if (mode == CalendarViewMode.HideLongTerm && ev.Repeat == RepeatRule.Daily) continue;
             foreach (var occurrence in Occurrences(ev, from, to, excluded))
             {
                 if (ev.Repeat == RepeatRule.None ? existingEvents.Contains(ev.Id) : existingOccurrences.Contains((ev.Id, occurrence))) continue;
@@ -338,6 +344,7 @@ public sealed partial class TaskService
                 day.Important |= ev.IsImportant;
                 day.Tasks.Add(new(ev.Title, ev.IsImportant, TaskState.Open, true, ev.Importance));
             }
+        }
         return days.ToDictionary(p => p.Key, p => new CalendarDaySummary(p.Value.Count, p.Value.RecordedCount,
             p.Value.Important, p.Value.Titles.OrderByDescending(t => t.Importance).Select(t => t.Title).ToArray())
         {

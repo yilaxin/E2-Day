@@ -33,7 +33,10 @@ public partial class MainWindow
     private void BuildMonth()
     {
         var month = _selectedMonth!.Value;
-        Header("细看这个月的安排", $"{month.Year} 年 {month.Month} 月", "日期下面显示任务标题。重要任务优先，已完成淡化保留；点击日期查看全部或编辑安排。");
+        Header("细看这个月的安排", $"{month.Year} 年 {month.Month} 月", _service.State.Settings.CalendarView == CalendarViewMode.Plain ?
+            "纯日历：保留日期、农历和节假日。点击日期仍可查看全部事项。" :
+            _service.State.Settings.CalendarView == CalendarViewMode.HideLongTerm ? "已隐藏长期任务标记，其余任务仍在日期下显示；点击日期查看全部事项。" :
+            "日期下面显示任务标题。重要任务优先，已完成淡化保留；点击日期查看全部或编辑安排。");
         var back = Ui.Button("‹ 全年总览", () => Navigate(PageKind.Year)); back.Tag = "back-year";
         var previous = Ui.Button("‹", () => ShiftMonth(-1)); previous.Tag = "previous-month";
         previous.ToolTip = "上个月"; previous.IsEnabled = month != new DateOnly(1901, 1, 1);
@@ -47,8 +50,10 @@ public partial class MainWindow
         {
             _renderedMonth = month; _monthDataRevision = -1; _monthHolidayRevision = -1; _monthDays.Clear();
             var body = new StackPanel();
+            body.Children.Add(CalendarDisplayControls(true));
             _monthCount = Ui.Text("", 11, Ui.Muted);
-            var legend = Ui.Row(Ui.Badge("今天"), Ui.Badge("★ 重要任务", true), Ui.Badge("✓ 已完成"), _monthCount);
+            _monthTaskLegend = Ui.Row(Ui.Badge("★ 重要任务", true), Ui.Badge("✓ 已完成"));
+            var legend = Ui.Row(Ui.Badge("今天"), _monthTaskLegend, _monthCount);
             legend.Margin = new Thickness(0, 0, 0, 16); body.Children.Add(legend);
             _monthNotice = Ui.Text($"{month.Year} 年放假调休数据尚未更新，农历和常见节日仍可查看。", 11, Ui.Amber);
             _monthNotice.Margin = new Thickness(0, 0, 0, 12); body.Children.Add(_monthNotice);
@@ -102,7 +107,8 @@ public partial class MainWindow
     {
         if (_monthDataRevision == _service.Revision && _monthHolidayRevision == _holidays.Revision && _monthToday == _service.Today) return;
         var month = _selectedMonth!.Value;
-        var summaries = _service.CalendarForYear(month.Year);
+        UpdateCalendarDisplayLabels(true);
+        var summaries = _service.CalendarForYear(month.Year, _service.State.Settings.CalendarView);
         foreach (var pair in _monthDays)
         {
             var day = pair.Value;
@@ -110,7 +116,7 @@ public partial class MainWindow
             UpdateMonthDay(day, summaries.GetValueOrDefault(pair.Key, CalendarDaySummary.Empty));
         }
         var total = summaries.Where(p => p.Key.Month == month.Month).Sum(p => p.Value.ScheduledCount);
-        _monthCount!.Text = $"本月 {total} 项安排 · 每天预览前三项";
+        _monthCount!.Text = _service.State.Settings.CalendarView == CalendarViewMode.Plain ? "任务标记已隐藏，点击日期仍可查看事项" : $"本月 {total} 项安排 · 每天预览前三项";
         _monthNotice!.Visibility = _holidays.HasYear(month.Year) ? Visibility.Collapsed : Visibility.Visible;
         _monthDataRevision = _service.Revision; _monthHolidayRevision = _holidays.Revision; _monthToday = _service.Today;
     }
@@ -118,7 +124,8 @@ public partial class MainWindow
     private void UpdateMonthDay(MonthDayView day, CalendarDaySummary summary)
     {
         var today = day.Date == _service.Today; var info = day.Information!;
-        if (day.LastInformation == info && day.WasToday == today && day.Previews is not null && day.Previews.SequenceEqual(summary.Tasks)) return;
+        if (day.LastInformation == info && day.WasToday == today && day.LastMode == _service.State.Settings.CalendarView && day.Previews is not null && day.Previews.SequenceEqual(summary.Tasks)) return;
+        day.LastMode = _service.State.Settings.CalendarView;
         day.LastInformation = info; day.WasToday = today; day.Previews = summary.Tasks;
         day.Number.Foreground = today || info.IsOffDay ? Ui.Accent : Ui.Ink;
         var status = info.WorkStatus.StartsWith("调休") ? "班" : info.WorkStatus.StartsWith("法定") ? "休" : "";
@@ -143,7 +150,8 @@ public partial class MainWindow
             more.Margin = new Thickness(0, 4, 0, 0); more.Tag = "month-more"; day.Tasks.Children.Add(more);
         }
         day.Button.ToolTip = $"{day.Date:yyyy-MM-dd dddd}\n{info.Lunar}\n{info.Festivals}\n{info.WorkStatus}" +
-            (summary.Tasks.Count > 0 ? "\n" + string.Join("\n", summary.Tasks.Select(t => (t.IsImportant ? "★ " : "") + (t.State == TaskState.Completed ? "✓ " : "") + t.Title)) : "\n暂无任务") + "\n点击查看或编辑当天安排";
+            (summary.Tasks.Count > 0 ? "\n" + string.Join("\n", summary.Tasks.Select(t => (t.IsImportant ? "★ " : "") + (t.State == TaskState.Completed ? "✓ " : "") + t.Title)) :
+                _service.State.Settings.CalendarView == CalendarViewMode.Plain ? "\n任务标记已隐藏" : "\n当前显示范围无任务") + "\n点击查看或编辑当天安排";
     }
 
     private sealed class MonthDayView(DateOnly date, Button button, TextBlock number, TextBlock count, TextBlock caption, StackPanel tasks)
@@ -158,5 +166,6 @@ public partial class MainWindow
         public DayInformation? LastInformation { get; set; }
         public IReadOnlyList<CalendarTaskPreview>? Previews { get; set; }
         public bool WasToday { get; set; }
+        public CalendarViewMode? LastMode { get; set; }
     }
 }

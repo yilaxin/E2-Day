@@ -21,7 +21,10 @@ public partial class MainWindow
 
     private void BuildYear()
     {
-        Header("全年安排，一眼可见", $"{_year} 年", "点击月份放大月历；点击日期查看任务或安排事件。数字表示当天安排的任务数量。");
+        Header("全年安排，一眼可见", $"{_year} 年", _service.State.Settings.CalendarView == CalendarViewMode.Plain ?
+            "纯日历：任务标记已隐藏。点击月份放大；点击日期仍可查看事项，原有任务和提醒继续保留。" :
+            _service.State.Settings.CalendarView == CalendarViewMode.HideLongTerm ? "已隐藏长期任务标记，保留其他安排；点击日期仍可查看完整事项。" :
+            "点击月份放大月历；点击日期查看任务或安排事件。数字表示当天安排的任务数量。");
         var previous = Ui.Button("‹", () => { if (_year > 1901) { _year--; RefreshPage(); } }); previous.Tag = "previous-year";
         var current = Ui.Button("回到今年", () => { _year = _service.Today.Year; RefreshPage(); }); current.Tag = "current-year";
         var next = Ui.Button("›", () => { if (_year < 2100) { _year++; RefreshPage(); } }); next.Tag = "next-year";
@@ -34,7 +37,9 @@ public partial class MainWindow
             _calendarDataRevision = -1; _calendarHolidayRevision = -1;
             _calendarDays.Clear(); _calendarMonthCounts.Clear();
             _calendarBody = new StackPanel();
-            var legend = Ui.Row(Ui.Badge("今天"), Ui.Badge("★ 重要任务", true), Ui.Text("休：法定休息  /  班：调休上班", 10, Ui.Muted));
+            _calendarBody.Children.Add(CalendarDisplayControls(false));
+            _yearTaskLegend = Ui.Badge("★ 重要任务", true);
+            var legend = Ui.Row(Ui.Badge("今天"), _yearTaskLegend, Ui.Text("休：法定休息  /  班：调休上班", 10, Ui.Muted));
             legend.Margin = new Thickness(0, 0, 0, 17); _calendarBody.Children.Add(legend);
             _calendarNotice = Ui.Text($"{_year} 年放假调休数据尚未更新，农历和常见节日仍可查看。", 11, Ui.Amber);
             _calendarNotice.Margin = new Thickness(0, 0, 0, 12); _calendarBody.Children.Add(_calendarNotice);
@@ -52,7 +57,8 @@ public partial class MainWindow
         var dataChanged = _calendarDataRevision != _service.Revision;
         var holidaysChanged = _calendarHolidayRevision != _holidays.Revision;
         if (!dataChanged && !holidaysChanged && _calendarToday == _service.Today) return;
-        var summaries = _service.CalendarForYear(_year);
+        UpdateCalendarDisplayLabels(false);
+        var summaries = _service.CalendarForYear(_year, _service.State.Settings.CalendarView);
         foreach (var pair in _calendarDays)
         {
             var day = pair.Value;

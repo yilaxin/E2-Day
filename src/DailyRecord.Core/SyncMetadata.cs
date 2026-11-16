@@ -27,7 +27,8 @@ public sealed class SyncMetadata
                 foreach (var field in old.Select(p => p.Key).Concat(current.Select(p => p.Key)).Distinct())
                     if (!JsonNode.DeepEquals(old[field], current[field]))
                         changes.Add(Key(collection, id, collection == "Tasks" && field is "State" or "CompletedOn" or "ArchiveReason" or "CompletedOrigin" ? "Status" :
-                            collection == "Tasks" && field is "Color" or "ColorOverride" or "QuickColorRestore" ? "ColorClassification" : field));
+                            collection == "Tasks" && field is "Color" or "ColorOverride" or "QuickColorRestore" ? "ColorClassification" :
+                            collection == "Events" && field is "EndDate" or "LongTermPeriods" ? "PeriodSchedule" : field));
             }
         }
         if (!JsonNode.DeepEquals(b["Settings"], a["Settings"])) changes.Add(Key("Settings", "settings", "Record"));

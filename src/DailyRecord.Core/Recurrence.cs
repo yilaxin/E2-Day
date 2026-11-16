@@ -68,7 +68,10 @@ public static class Recurrence
                 break;
             case RepeatRule.Daily:
                 for (var dayNumber = from.DayNumber; dayNumber <= to.DayNumber; dayNumber++)
-                    yield return DateOnly.FromDayNumber(dayNumber);
+                {
+                    var day = DateOnly.FromDayNumber(dayNumber);
+                    if (LongTermSchedule.Contains(definition, day)) yield return day;
+                }
                 break;
             case RepeatRule.Weekly:
                 var weeks = Math.Max(0, (from.DayNumber - start.DayNumber + 6) / 7);

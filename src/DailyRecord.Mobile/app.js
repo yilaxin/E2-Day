@@ -33,6 +33,8 @@ export function validateMobileState(state){
  for(const row of records)if(typeof row.Title!=='string'||!row.Title.trim()||typeof row.Notes!=='string'||!Array.isArray(row.ImageIds)||row.ImageIds.length>8||new Set(row.ImageIds).size!==row.ImageIds.length||row.ImageIds.some(id=>typeof id!=='string'||! /^[A-F0-9]{64}$/.test(id)))fail();
  const events=new Set(state.Events.map(row=>row.Id)),tasks=new Set(state.Tasks.map(row=>row.Id)),occurrencesSeen=new Set();
  for(const row of state.Events)if(!validDate(row.StartDate)||!['Normal','Important','VeryImportant'].includes(row.Importance)||!['None','Weekly','Monthly','Yearly','LunarYearly','Daily'].includes(row.Repeat)||row.Repeat==='LunarYearly'&&(!Number.isInteger(row.LunarMonth)||row.LunarMonth<1||row.LunarMonth>12||!Number.isInteger(row.LunarDay)||row.LunarDay<1||row.LunarDay>30))fail();
+ for(const ev of state.Events){if(ev.LongTermPeriods!==undefined&&(!Array.isArray(ev.LongTermPeriods)||ev.LongTermPeriods.length>2000||ev.Repeat!=='Daily'&&ev.LongTermPeriods.length))fail();let prior=null;for(const p of ev.LongTermPeriods||[]){if(!p||!validDate(p.Start)||p.Start<ev.StartDate||typeof p.EndConfirmed!=='boolean'||p.End!=null&&(!validDate(p.End)||p.End<p.Start&&!p.EndConfirmed)||prior&&(prior.End==null||prior.End>=p.Start))fail();prior=p;}}
+ if(state.Settings.CalendarView!==undefined&&!['All','HideLongTerm','Plain'].includes(state.Settings.CalendarView)||state.Settings.PreviousCalendarView!==undefined&&!['All','HideLongTerm'].includes(state.Settings.PreviousCalendarView))fail();
  for(const row of state.Tasks){if(!validDate(row.ScheduledDate)||!validDate(row.OriginalScheduledDate)||!['Open','Completed','Cancelled'].includes(row.State)||!['Normal','Important','VeryImportant'].includes(row.EventImportance)||typeof row.CreatedAt!=='string'||row.CompletedOn!==null&&row.CompletedOn!==undefined&&!validDate(row.CompletedOn)||row.State==='Completed'&&!row.CompletedOn)fail();if(row.EventId){const key=row.EventId+'/'+row.OccurrenceDate;if(!events.has(row.EventId)||!validDate(row.OccurrenceDate)||occurrencesSeen.has(key))fail();occurrencesSeen.add(key);}}
  const converted=new Set();
  for(const row of state.Tasks){if(!validTime(row.CreatedAt))fail();
@@ -46,7 +48,7 @@ export function validateMobileState(state){
 }
 export function occurrences(event,from,to,lunar={}){
  const result=[],start=event.StartDate;from=from>start?from:start;if(event.EndDate&&event.EndDate<to)to=event.EndDate;if(to<from)return result;
- const push=date=>{if(date>=from&&date<=to)result.push(date);};
+ const push=date=>{if(date>=from&&date<=to&&(event.Repeat!=='Daily'||!event.LongTermPeriods?.length||event.LongTermPeriods.some(p=>p.Start<=date&&(!p.End||date<=p.End))))result.push(date);};
  const s=dayDate(start),f=dayDate(from),t=dayDate(to);
  if(event.Repeat==='None')push(start);
  else if(event.Repeat==='Daily'){for(let date=from;date<=to;date=addDays(date,1))push(date);}
@@ -101,8 +103,9 @@ async function ensureUpcoming(){
 export function canonical(value){
  if(value&&typeof value==='object'&&!Array.isArray(value)){
   if('ImageIds'in value&&'Title'in value)value={Color:'None',...value};
+  if('StartDate'in value&&'Repeat'in value)value={LongTermPeriods:[],...value};
   if('OriginalScheduledDate'in value)value={ConversionSources:[],CompletedOrigin:null,ColorOverride:false,QuickColorRestore:null,...value};
-  if('NormalDays'in value)value={TaskColorNames:['本时段要做','专注处理','零碎处理','待沟通','稍后安排'],QuickTaskColor:'Blue',...value};
+  if('NormalDays'in value)value={TaskColorNames:['本时段要做','专注处理','零碎处理','待沟通','稍后安排'],QuickTaskColor:'Blue',CalendarView:'All',PreviousCalendarView:'All',...value};
  }
  if(Array.isArray(value))return '['+value.map(canonical).join(',')+']';
  if(value&&typeof value==='object')return '{'+Object.keys(value).filter(key=>value[key]!==undefined).sort().map(key=>{let item=value[key];if(['CreatedAt','At'].includes(key)&&typeof item==='string'&&!Number.isNaN(Date.parse(item)))item=new Date(item).toISOString();return JSON.stringify(key)+':'+canonical(item);}).join(',')+'}';
@@ -123,7 +126,7 @@ export function resolveImport(plan,choices){
  for(const task of state.Tasks){const histories=state.Activities.filter(history=>history.TaskId===task.Id&&!history.Reverted);for(const history of histories)if(history.Kind==='Completed'&&(task.State!=='Completed'||history.Day!==task.CompletedOn)||history.Kind==='Cancelled'&&task.State!=='Cancelled')history.Reverted=true;const groups=new Map();for(const history of histories.filter(history=>!history.Reverted)){const key=history.Kind+'/'+history.Day;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(history);}for(const group of groups.values())for(const redundant of group.sort((a,b)=>Date.parse(a.At)-Date.parse(b.At)||a.Id.localeCompare(b.Id)).slice(1))redundant.Reverted=true;}
  return state;
 }
-export function visible(task,day,state){const event=state.Events.find(e=>e.Id===task.EventId);if(event?.Repeat==='Daily')return task.State==='Open'&&task.ScheduledDate===day&&event.StartDate<=day&&(!event.EndDate||event.EndDate>=day);const lead=state.Settings[`${task.EventImportance==='Normal'?'Normal':task.EventImportance==='Important'?'Important':'VeryImportant'}Days`]||0;return task.State==='Open'&&(task.EventId?addDays(task.ScheduledDate,-lead):task.ScheduledDate)<=day;}
+export function visible(task,day,state){const event=state.Events.find(e=>e.Id===task.EventId);if(event?.Repeat==='Daily')return task.State==='Open'&&task.ScheduledDate===day&&occurrences(event,day,day).length>0;const lead=state.Settings[`${task.EventImportance==='Normal'?'Normal':task.EventImportance==='Important'?'Important':'VeryImportant'}Days`]||0;return task.State==='Open'&&(task.EventId?addDays(task.ScheduledDate,-lead):task.ScheduledDate)<=day;}
 function sorted(tasks){return [...tasks].sort((a,b)=>Number(b.IsImportant)-Number(a.IsImportant)||a.ScheduledDate.localeCompare(b.ScheduledDate)||a.CreatedAt.localeCompare(b.CreatedAt));}
 function taskRow(task){
  const card=node('article',{class:`task ${task.State==='Completed'?'completed':''}`});

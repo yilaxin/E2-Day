@@ -6,16 +6,17 @@ public sealed partial class TaskService
     public bool IsLongTermActive(TaskItem task) => Definition(task) is { Repeat: RepeatRule.Daily } ev &&
         (ev.EndDate is null || ev.EndDate >= Today && ev.EndDate >= ev.StartDate);
     private bool IsLongTermActive(TaskItem task, DateOnly day) => Definition(task) is { Repeat: RepeatRule.Daily } ev &&
-        ev.StartDate <= day && (ev.EndDate is null || ev.EndDate >= day);
+        LongTermSchedule.Contains(ev, day);
     private EventDefinition? Definition(TaskItem task) => State.Events.FirstOrDefault(e => e.Id == task.EventId);
     private EventDefinition LongTermDefinition(TaskItem task) => Definition(task) is { Repeat: RepeatRule.Daily } ev ? ev :
         throw new ArgumentException("此任务不是长期任务。");
 
-    public TaskItem AddLongTermTask(string title, string notes, DateOnly start, bool important = false, IReadOnlyList<NoteImage>? images = null, TaskColor color = TaskColor.None)
+    public TaskItem AddLongTermTask(string title, string notes, DateOnly start, bool important = false, IReadOnlyList<NoteImage>? images = null, TaskColor color = TaskColor.None, int? durationDays = null)
     {
         var ev = CreateDefinition(title, notes, start, EventImportance.Normal, RepeatRule.Daily);
         if (!Enum.IsDefined(color)) throw new ArgumentException("分类颜色无效。");
         ev.IsImportant = important; ev.ImageIds = PrepareImages(images); ev.Color = color;
+        if (durationDays is not null) { var period = LongTermSchedule.Create(start, durationDays); ev.LongTermPeriods.Add(period); ev.EndDate = period.End; }
         State.Events.Add(ev); var task = EnsureOccurrence(ev, start); EnsureUpcoming(); Save(images); return task;
     }
 
@@ -51,6 +52,7 @@ public sealed partial class TaskService
         var ev = LongTermDefinition(selected);
         if (ev.EndDate < Today) return;
         ev.EndDate = Today.AddDays(-1);
+        if (ev.LongTermPeriods.Count > 0) ev.LongTermPeriods[^1] = ev.LongTermPeriods[^1] with { EndConfirmed = true };
         foreach (var task in State.Tasks.Where(t => t.EventId == ev.Id && t.State == TaskState.Open && t.ScheduledDate >= Today))
             CancelWithoutSave(task, "长期任务已结束");
         State.Activities.Add(Snapshot(selected, ActivityKind.Ended)); Save();
@@ -58,7 +60,12 @@ public sealed partial class TaskService
 
     public void ResumeLongTerm(TaskItem selected)
     {
-        var ev = LongTermDefinition(selected); ev.EndDate = null;
+        var ev = LongTermDefinition(selected);
+        if (ev.LongTermPeriods.Count > 0)
+        {
+            RenewLongTerm(ev, Today > ev.StartDate ? Today : ev.StartDate, 30); return;
+        }
+        ev.EndDate = null;
         foreach (var task in State.Tasks.Where(t => t.EventId == ev.Id && t.ScheduledDate >= Today &&
                      t.State == TaskState.Cancelled && (t.ArchiveReason == "长期任务已结束" || t.ScheduledDate == Today || t.Id == selected.Id)))
         {

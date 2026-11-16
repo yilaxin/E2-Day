@@ -68,7 +68,7 @@ public sealed class TaskAnalytics
         {
             if (t.State != TaskState.Open || t.ScheduledDate > today) return false;
             return t.EventId is null || !definitions.TryGetValue(t.EventId, out var ev) || ev.Repeat != RepeatRule.Daily ||
-                t.ScheduledDate == today && ev.StartDate <= today && (ev.EndDate is null || ev.EndDate >= today);
+                t.ScheduledDate == today && LongTermSchedule.Contains(ev, today);
         })).ToArray();
         Backlog = [Group("today", "今日到期", age => age == 0), Group("1-3", "逾期 1–3 天", age => age is >= 1 and <= 3),
             Group("4-7", "逾期 4–7 天", age => age is >= 4 and <= 7), Group("8+", "逾期超过 7 天", age => age >= 8)];

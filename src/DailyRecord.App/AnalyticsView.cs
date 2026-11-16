@@ -230,7 +230,7 @@ public partial class MainWindow
             var number = index - offset + 1;
             if (number < 1 || number > dayCount) { calendar.Children.Add(new Border { Height = 34 }); continue; }
             var day = new DateOnly(month.Year, month.Month, number); var done = habit.CompletedDays.ContainsKey(day);
-            var inactive = day < habit.Definition.StartDate || day > habit.Definition.EndDate;
+            var inactive = !LongTermSchedule.Contains(habit.Definition, day);
             var future = day > data.Today;
             var canCompleteToday = day == data.Today && !inactive && data.Backlog[0].Tasks.Any(t => t.EventId == habit.Definition.Id && t.OccurrenceDate == day);
             var hint = done ? (future ? "已提前完成" : "已完成") : canCompleteToday ? "今天待完成 · 点击打卡" : future ? "未来日期" : inactive ? "不在当前任务起止范围内" : "暂无完成记录";
@@ -253,7 +253,9 @@ public partial class MainWindow
         }
         Stat("所选月份完成", habit.CompletedInMonth(month, data.Today), "analytics-habit-month-count");
         Stat("当前连续", habit.CurrentStreak, "analytics-habit-current"); Stat("最长连续", habit.LongestStreak, "analytics-habit-longest");
-        summary.Children.Add(Ui.Text(habit.Ended ? "已结束 · 完成记录保留" : habit.Definition.StartDate > data.Today ? $"{habit.Definition.StartDate:yyyy/M/d} 开始" : "今天尚未完成时，从昨天续算；\n最长连续按全部已有记录计算。", 10, Ui.Muted));
+        var nextPeriod = habit.Definition.LongTermPeriods.FirstOrDefault(p => p.Start > data.Today);
+        summary.Children.Add(Ui.Text(habit.Ended ? "已结束 · 完成记录保留" : !LongTermSchedule.Contains(habit.Definition, data.Today) && nextPeriod is not null ?
+            $"下阶段 {nextPeriod.Start:yyyy/M/d} 开始 · 空档不计打卡" : habit.Definition.StartDate > data.Today ? $"{habit.Definition.StartDate:yyyy/M/d} 开始" : "今天尚未完成时，从昨天续算；\n最长连续按全部已有记录计算。", 10, Ui.Muted));
         var columns = new Grid(); columns.ColumnDefinitions.Add(new ColumnDefinition()); columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) });
         columns.Children.Add(calendar); Grid.SetColumn(summary, 1); columns.Children.Add(summary);
         var nav = Ui.Row(Ui.Button("‹", () => { _analyticsHabitMonth = month.AddMonths(-1); RefreshPage(); }), Ui.Text(month.ToString("yyyy 年 M 月"), 12, bold: true),

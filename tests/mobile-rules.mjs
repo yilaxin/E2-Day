@@ -31,6 +31,17 @@ if(process.argv[2]){
  invalidTime.Tasks[0].CreatedAt='2026-10-14';assert.throws(()=>validateMobileState(invalidTime));
  state.Tasks[0].ScheduledDate='2026-02-30';assert.throws(()=>validateMobileState(state));
  console.log('PASS portable backup: desktop hash matches browser implementation, PNG references preserved, invalid dates rejected before restore');
+ const periodFile=path.join(path.dirname(process.argv[2]),'period-sample.json');
+ if(fs.existsSync(periodFile)){
+  const backup=JSON.parse(fs.readFileSync(periodFile,'utf8'));assert.equal(await portableHash(backup),backup.Sha256);
+  const data=validateMobileState(JSON.parse(backup.Payload)),ev=data.Events[0];assert.equal(ev.LongTermPeriods.length,2);
+  assert.equal(data.Settings.CalendarView,'Plain');assert.equal(data.Settings.PreviousCalendarView,'HideLongTerm');
+  assert.equal(occurrences(ev,'2026-10-08','2026-10-09').length,0);assert.equal(occurrences(ev,'2026-10-01','2026-11-30').length,8);
+  const round=resolveImport(previewImport(data,structuredClone(data)),{});assert.deepEqual(round.Events[0].LongTermPeriods,ev.LongTermPeriods);
+  const bad=structuredClone(data);bad.Events[0].LongTermPeriods[1].Start=bad.Events[0].LongTermPeriods[0].Start;assert.throws(()=>validateMobileState(bad));
+  bad.Events[0].LongTermPeriods=[];bad.Settings.PreviousCalendarView='Plain';assert.throws(()=>validateMobileState(bad));
+  console.log('PASS staged-period portable hash, renewal gap, recurring bounds, calendar preferences, image backup roundtrip and invalid overlap rejection');
+ }
  const quickFile=path.join(path.dirname(process.argv[2]),'quick-color-sample.json');
  if(fs.existsSync(quickFile)){
   const backup=JSON.parse(fs.readFileSync(quickFile,'utf8'));assert.equal(await portableHash(backup),backup.Sha256);

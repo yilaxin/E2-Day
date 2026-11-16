@@ -57,7 +57,8 @@ public static class SyncMerge
                     // These fields describe one state transition and must never be merged independently.
                     var groups = collection == "Tasks" ? new[] {
                         (Name: "Status", Keys: new[] { "State", "CompletedOn", "ArchiveReason", "CompletedOrigin" }),
-                        (Name: "ColorClassification", Keys: new[] { "Color", "ColorOverride", "QuickColorRestore" }) } : [];
+                        (Name: "ColorClassification", Keys: new[] { "Color", "ColorOverride", "QuickColorRestore" }) } : collection == "Events" ?
+                        new[] { (Name: "PeriodSchedule", Keys: new[] { "EndDate", "LongTermPeriods" }) } : [];
                     var grouped = groups.SelectMany(g => g.Keys).ToArray();
                     foreach (var key in co.Select(k => k.Key).Concat(po.Select(k => k.Key)).Distinct().Where(k => !grouped.Contains(k)))
                         merged[key] = MergeValue(collection, id, key, bo[key], co[key], po[key], conflicts, metadata?.Touched(collection, id, key, baseVersion) ?? false);

@@ -25,6 +25,11 @@ internal sealed class EditDialog : Window
     private readonly StackPanel _eventFields;
     private readonly StackPanel _scopeFields;
     private readonly NoteImageEditor _images;
+    private readonly DurationEditor _duration;
+    public int? DurationDays => _duration.Days;
+    public bool DurationChanged => Kind == ItemKind.LongTerm && _duration.IsEnabled &&
+        (_definition is null || _originalKind != ItemKind.LongTerm || DurationDays != OriginalDuration);
+    private int? OriginalDuration => _definition?.LongTermPeriods.LastOrDefault() is { End: { } end } period ? Math.Max(1, end.DayNumber - period.Start.DayNumber + 1) : null;
     private readonly TaskItem? _task;
     private readonly EventDefinition? _definition;
     private readonly TaskService? _service;
@@ -74,10 +79,14 @@ internal sealed class EditDialog : Window
         _color = ColorStyle.Picker(service?.State.Settings ?? new UserSettings(), task?.Color ?? initialColor ?? TaskColor.None, "item-color");
         _colorScope = new ComboBox { ItemsSource = new[] { "仅这一次", "这次及后续未完成安排（保留单次分类）" }, SelectedIndex = 0, Tag = "item-color-scope" };
         _colorScopeFields = Ui.Stack(Ui.Label("颜色影响范围"), _colorScope);
+        var originalPeriod = ev?.LongTermPeriods.LastOrDefault();
+        var days = ev?.Repeat == RepeatRule.Daily ? originalPeriod?.End is { } final ? Math.Max(1, final.DayNumber - originalPeriod.Start.DayNumber + 1) : (int?)null : 30;
+        _duration = new DurationEditor(() => Kind == ItemKind.LongTerm && _originalKind == ItemKind.LongTerm && _definition is not null ?
+            _service?.DurationEditStart(_definition) ?? _definition.StartDate : _date.SelectedDate is { } selected ? DateOnly.FromDateTime(selected) : date, days);
         _scopeFields = Ui.Stack(Ui.Label("影响范围"), _scope);
         _eventFields = Ui.Stack(Ui.Label("事件重要程度 · 决定提前提醒天数"), _importance, Ui.Label("重复规则"), _repeat);
         var form = Ui.Stack(_heading, Ui.Text("保存前可调整类型，原有内容和历史继续保留。", 12, Ui.Muted),
-            Ui.Label("事项类型"), _kind, Ui.Label("标题"), _title, _dateLabel, _date, _scopeFields, _eventFields, _hint,
+            Ui.Label("事项类型"), _kind, Ui.Label("标题"), _title, _dateLabel, _date, _scopeFields, _eventFields, _duration, _hint,
             Ui.Label("颜色分类"), _color, _colorScopeFields, Ui.Label("备注 · 文字与图片（可选）"), _notes, _images, _importantTask,
             Ui.Text("星标只突出显示，不改变提前提醒日期。", 11, Ui.Muted));
         var cancel = Ui.Button("取消", () => DialogResult = false); cancel.Tag = "item-cancel"; cancel.IsCancel = true;
@@ -105,6 +114,10 @@ internal sealed class EditDialog : Window
         { _dateLocked = false; _date.SelectedDate = _conversionDateDraft ?? _originalDate; }
         _date.IsEnabled = !lockDate;
         _eventFields.Visibility = Kind == ItemKind.Event ? Visibility.Visible : Visibility.Collapsed;
+        _duration.Visibility = Kind == ItemKind.LongTerm ? Visibility.Visible : Visibility.Collapsed;
+        _duration.IsEnabled = Kind != _originalKind || _task?.State != TaskState.Cancelled &&
+            (_definition?.Repeat != RepeatRule.Daily || _definition.EndDate is null || _definition.EndDate >= (_service?.Today ?? DateOnly.FromDateTime(DateTime.Today)));
+        _duration.UpdatePreview();
         var recurring = _definition is { Repeat: not RepeatRule.None };
         _colorScopeFields.Visibility = recurring && !converting ? Visibility.Visible : Visibility.Collapsed;
         var archivedEdit = _task?.State == TaskState.Cancelled && !converting;
@@ -141,7 +154,7 @@ internal sealed class EditDialog : Window
             }
             else if (Kind == ItemKind.LongTerm)
                 hints.Add(_originalKind == ItemKind.LongTerm && !converting ? "修改用于今天未完成及后续安排，过去的记录保留。结束请使用清单上的‘结束’。" :
-                    $"从 {Date:yyyy/M/d} 开始每天出现，不提前提醒；当天完成后第二天继续，直到手动结束。");
+                    $"从 {Date:yyyy/M/d} 开始每天出现，不提前提醒；按上方持续时间执行，到期再决定是否继续。");
             else hints.Add($"按普通任务在 {Date:yyyy/M/d} 进入今日清单，不再使用事件的提前提醒，未完成会继续保留。");
         }
         _hint.Text = string.Join("\n", hints);
@@ -152,6 +165,11 @@ internal sealed class EditDialog : Window
         if (!_images.PendingImport.IsCompleted) { MessageBox.Show(this, "图片还在处理中，请稍等。", "正在添加图片"); return; }
         if (string.IsNullOrWhiteSpace(ItemTitle)) { MessageBox.Show(this, "请填写标题。", "还差一个标题"); _title.Focus(); return; }
         if (_date.SelectedDate is null) { MessageBox.Show(this, "请选择有效日期。", "检查日期"); return; }
+        if (Kind == ItemKind.LongTerm && _duration.IsEnabled)
+        {
+            try { _ = _duration.Period; if (_definition is not null && _originalKind == Kind && DurationChanged) _service?.ValidateLongTermDuration(_definition, DurationDays); }
+            catch (ArgumentException ex) { MessageBox.Show(this, ex.Message, "检查持续时间"); return; }
+        }
         DialogResult = true;
     }
 }

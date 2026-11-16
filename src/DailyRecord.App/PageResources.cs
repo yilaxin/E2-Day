@@ -97,6 +97,7 @@ public partial class MainWindow
         CalendarHost.Child = null; _calendarBody = null; _calendarMonths = null; _calendarNotice = null;
         _calendarDays.Clear(); _calendarMonthCounts.Clear(); _yearHiddenAt = null;
         _calendarDataRevision = -1; _calendarHolidayRevision = -1;
+        _yearViewCaption = null; _yearTaskLegend = null;
     }
 
     private void ReleaseMonthView()
@@ -104,6 +105,7 @@ public partial class MainWindow
         if (MonthHost.Child is { } body) RetirePageTree(body);
         MonthHost.Child = null; _renderedMonth = null; _monthCount = null; _monthNotice = null;
         _monthDays.Clear(); _monthHiddenAt = null; _monthDataRevision = -1; _monthHolidayRevision = -1;
+        _monthViewCaption = null; _monthTaskLegend = null;
     }
 
     private void ReleasePageResources()
@@ -115,6 +117,7 @@ public partial class MainWindow
         }
         ReleaseYearView(); ReleaseMonthView();
         _analyticsHabitPicker = null; _quickInput = null; _quickImportant = null;
+        _yearViewCaption = null; _monthViewCaption = null; _yearTaskLegend = null; _monthTaskLegend = null;
         ClearPageContent();
     }
 

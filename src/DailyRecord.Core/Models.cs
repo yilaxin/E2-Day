@@ -9,6 +9,7 @@ public enum TaskState { Open, Completed, Cancelled }
 public enum EditScope { ThisOccurrence, ThisAndFuture }
 public enum ItemKind { Task, Event, LongTerm }
 public enum TaskColor { None, Blue, Purple, Teal, Pink, Gray }
+public enum CalendarViewMode { All, HideLongTerm, Plain }
 public enum ActivityKind { Viewed, Completed, Cancelled, Ended }
 
 public interface IClock
@@ -25,6 +26,7 @@ public sealed class SystemClock : IClock
 
 public sealed class EventDefinition
 {
+    public List<LongTermPeriod> LongTermPeriods { get; set; } = [];
     public TaskColor Color { get; set; }
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Title { get; set; } = "";
@@ -67,6 +69,7 @@ public sealed class TaskItem
 public sealed record OccurrenceLink(string EventId, DateOnly Day);
 public sealed record CompletionOrigin(string? EventId, DateOnly? Day, RepeatRule Repeat);
 public sealed record QuickColorRestore(TaskColor AppliedColor, TaskColor PreviousColor, bool PreviousOverride);
+public sealed record LongTermPeriod(DateOnly Start, DateOnly? End, bool EndConfirmed = false);
 
 public sealed class ActivityRecord
 {
@@ -86,6 +89,8 @@ public sealed class ActivityRecord
 
 public sealed class UserSettings
 {
+    public CalendarViewMode CalendarView { get; set; }
+    public CalendarViewMode PreviousCalendarView { get; set; }
     public TaskColor QuickTaskColor { get; set; } = TaskColor.Blue;
     public List<string> TaskColorNames { get; set; } = [.. TaskColors.DefaultNames];
     public int NormalDays { get; set; }
@@ -188,6 +193,17 @@ public static class StateJson
             throw new InvalidDataException("已转换的安排与原重复安排冲突，请使用新版客户端交换并保留一致的事项版本。");
         foreach (var ev in state.Events)
         {
+            if (ev.LongTermPeriods is null || ev.LongTermPeriods.Count > 2000 || ev.Repeat != RepeatRule.Daily && ev.LongTermPeriods.Count > 0)
+                throw new InvalidDataException("长期任务阶段数据无效。");
+            LongTermPeriod? previous = null;
+            foreach (var period in ev.LongTermPeriods)
+            {
+                if (period is null || !ValidDate(period.Start) || period.Start < ev.StartDate ||
+                    period.End is { } periodEnd && (!ValidDate(periodEnd) || periodEnd < period.Start && !period.EndConfirmed) ||
+                    previous is not null && (previous.End is null || previous.End >= period.Start))
+                    throw new InvalidDataException("长期任务阶段日期重叠或无效。");
+                previous = period;
+            }
             if (!Enum.IsDefined(ev.Color)) throw new InvalidDataException("事件分类颜色无效。");
             NoteImage.ValidateIds(ev.ImageIds);
             if (string.IsNullOrWhiteSpace(ev.Id) || string.IsNullOrWhiteSpace(ev.Title) || ev.Notes is null || !ValidDate(ev.StartDate) ||
@@ -206,6 +222,8 @@ public static class StateJson
             if (!Enum.IsDefined(activity.Color)) throw new InvalidDataException("历史分类颜色无效。");
         }
         TaskColors.ValidateNames(state.Settings.TaskColorNames);
+        if (!Enum.IsDefined(state.Settings.CalendarView) || !Enum.IsDefined(state.Settings.PreviousCalendarView) || state.Settings.PreviousCalendarView == CalendarViewMode.Plain)
+            throw new InvalidDataException("日历显示设置无效。");
         if (!Enum.IsDefined(state.Settings.QuickTaskColor) || state.Settings.QuickTaskColor == TaskColor.None)
             throw new InvalidDataException("快捷颜色必须是五种分类颜色之一。");
         if (state.News.Articles.Any(a => string.IsNullOrWhiteSpace(a.Title) || a.Summary is null ||

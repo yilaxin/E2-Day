@@ -21,7 +21,7 @@ public sealed partial class TaskService
 
     public void ConvertItem(TaskItem selected, ItemKind target, string title, string notes, DateOnly date, bool important,
         EventImportance importance = EventImportance.Normal, RepeatRule repeat = RepeatRule.None,
-        EditScope scope = EditScope.ThisOccurrence, IReadOnlyList<NoteImage>? images = null, TaskColor? color = null)
+        EditScope scope = EditScope.ThisOccurrence, IReadOnlyList<NoteImage>? images = null, TaskColor? color = null, int? durationDays = null)
     {
         if (!State.Tasks.Contains(selected)) throw new ArgumentException("事项已变化，请重新打开编辑。");
         ArgumentNullException.ThrowIfNull(notes);
@@ -34,6 +34,10 @@ public sealed partial class TaskService
         var replacement = target == ItemKind.Task ? null : CreateDefinition(title, notes, date,
             target == ItemKind.LongTerm ? EventImportance.Normal : importance, target == ItemKind.LongTerm ? RepeatRule.Daily : repeat);
         if (target == ItemKind.Event && repeat == RepeatRule.Daily) throw new ArgumentException("每天重复请选长期任务。");
+        if (target == ItemKind.LongTerm && durationDays is not null)
+        {
+            var period = LongTermSchedule.Create(date, durationDays); replacement!.LongTermPeriods.Add(period); replacement.EndDate = period.End;
+        }
         var ids = images is null ? [.. selected.ImageIds] : PrepareImages(images);
         var original = Definition(selected); var anchor = selected.OccurrenceDate;
         if (selected.State == TaskState.Completed) selected.CompletedOrigin ??= CaptureCompletionOrigin(selected);
