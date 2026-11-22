@@ -89,6 +89,7 @@ public sealed class ActivityRecord
 
 public sealed class UserSettings
 {
+    public TodayExecutionPlan? ExecutionPlan { get; set; }
     public CalendarViewMode CalendarView { get; set; }
     public CalendarViewMode PreviousCalendarView { get; set; }
     public TaskColor QuickTaskColor { get; set; } = TaskColor.Blue;
@@ -222,6 +223,9 @@ public static class StateJson
             if (!Enum.IsDefined(activity.Color)) throw new InvalidDataException("历史分类颜色无效。");
         }
         TaskColors.ValidateNames(state.Settings.TaskColorNames);
+        if (state.Settings.ExecutionPlan is { } plan && (!ValidDate(plan.Day) || plan.TaskIds is null ||
+            plan.TaskIds.Any(string.IsNullOrWhiteSpace) || plan.TaskIds.Distinct(StringComparer.Ordinal).Count() != plan.TaskIds.Count))
+            throw new InvalidDataException("今日执行顺序数据无效。");
         if (!Enum.IsDefined(state.Settings.CalendarView) || !Enum.IsDefined(state.Settings.PreviousCalendarView) || state.Settings.PreviousCalendarView == CalendarViewMode.Plain)
             throw new InvalidDataException("日历显示设置无效。");
         if (!Enum.IsDefined(state.Settings.QuickTaskColor) || state.Settings.QuickTaskColor == TaskColor.None)

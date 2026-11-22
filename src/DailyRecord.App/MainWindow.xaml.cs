@@ -61,9 +61,19 @@ public partial class MainWindow : Window
         _wide = Width >= 1240;
         PreviewMouseDown += (_, _) => _colorScrollVersion++;
         PreviewMouseWheel += (_, _) => _colorScrollVersion++;
-        PreviewKeyDown += (_, _) => _colorScrollVersion++;
+        PreviewKeyDown += (_, e) =>
+        {
+            _colorScrollVersion++;
+            if (e.Key == Key.Escape && _executionHandle is not null)
+            {
+                CancelExecutionDrag();
+                e.Handled = true;
+            }
+        };
         Closed += (_, _) =>
         {
+            CancelExecutionDrag();
+            _executionRows.Clear();
             _pageScroll.Dispose(); _calendarScroll.Dispose(); _monthScroll.Dispose();
             ReleasePageResources();
             DisposeColorNotice();
@@ -131,6 +141,8 @@ public partial class MainWindow : Window
     }
     private void RefreshPage()
     {
+        CancelExecutionDrag();
+        _executionRows.Clear();
         StopPageScrolling();
         RememberDraft(); _quickInput = null; _quickImportant = null; _colorSelectionCaption = null; _colorBatchButton = null;
         ReleasePageFocus();
@@ -186,14 +198,14 @@ public partial class MainWindow : Window
             $"{today:yyyy 年}  ·  {information.Lunar}  ·  {information.WorkStatus}");
         Button? copyImage = null;
         copyImage = Ui.Button("复制为图片", async () => await CopyTodayTasksImageAsync(copyImage!));
-        copyImage.Tag = "copy-today-image"; copyImage.ToolTip = _taskColorFilter is null ? "复制今日待办和已完成为图片，粘贴即可分享" : "复制当前分类：待办、提前提醒、已查看及今日已完成";
+        copyImage.Tag = "copy-today-image"; copyImage.ToolTip = "按当前显示顺序复制今日清单为图片";
         HeaderActions.Children.Add(copyImage);
         HeaderActions.Children.Add(Ui.Button("＋ 安排事件", () => OpenEventEditor(today)));
         HeaderActions.Children.Add(Ui.Button("＋ 添加任务", () => OpenTaskEditor(today), accent: true));
 
         var allToday = _service.TodayColorTasks();
         var filtered = allToday.Where(t => _taskColorFilter is null || t.Color == _taskColorFilter).ToList();
-        var open = filtered.Where(t => t.State == TaskState.Open).ToList();
+        var open = _service.TodayExecutionOrder(_taskColorFilter);
         var done = filtered.Where(t => t.State == TaskState.Completed).ToList();
         var viewed = open.Where(t => _service.IsViewed(t, today)).ToList();
         var pending = open.Where(t => !_service.IsViewed(t, today) && t.ScheduledDate <= today).ToList();
@@ -236,9 +248,15 @@ public partial class MainWindow : Window
         var quickCaption = Ui.Text("写下今天要完成的任务，按 Enter 添加", 11, Ui.Muted);
         quickCaption.Margin = new Thickness(0, 0, 0, 8); left.Children.Add(quickCaption); left.Children.Add(quick);
 
-        left.Children.Add(TaskGroup("今日待办", "到期与逾期任务都在这里", pending, "还没有待办，写下今天的一件事吧。"));
-        if (upcoming.Count > 0) left.Children.Add(TaskGroup("提前提醒", "先看一眼，提前准备", upcoming, ""));
-        if (viewed.Count > 0) left.Children.Add(TaskGroup("今日已查看", "明天会再次提醒，完成后才会停止", viewed, "", dim: true));
+        left.Children.Add(ExecutionOrderControls());
+        if (_service.UsesManualExecutionOrder)
+            left.Children.Add(TaskGroup("今日执行清单", "按你的顺序执行", open, "当前没有未完成事项。", execution: true, numbered: true));
+        else
+        {
+            left.Children.Add(TaskGroup("今日待办", "到期与逾期任务都在这里", pending, "还没有待办，写下今天的一件事吧。", execution: true));
+            if (upcoming.Count > 0) left.Children.Add(TaskGroup("提前提醒", "先看一眼，提前准备", upcoming, "", execution: true));
+            if (viewed.Count > 0) left.Children.Add(TaskGroup("今日已查看", "明天会再次提醒，完成后才会停止", viewed, "", dim: true, execution: true));
+        }
         left.Children.Add(TaskGroup("今日已完成", "做过的事，都会留在这里", done, "完成第一件任务后，会在这里留下记录。", dim: true));
         var right = BuildNewsPanel();
         if (_wide)
@@ -265,7 +283,8 @@ public partial class MainWindow : Window
         _quickInput?.Focus();
     }
 
-    private Border TaskGroup(string title, string subtitle, IEnumerable<TaskItem> tasks, string empty, bool dim = false)
+    private Border TaskGroup(string title, string subtitle, IEnumerable<TaskItem> tasks, string empty, bool dim = false,
+        bool execution = false, bool numbered = false)
     {
         var list = tasks.ToList();
         var heading = Ui.Row(Ui.Text(title, 16, bold: true), Ui.Badge(list.Count.ToString()));
@@ -276,11 +295,23 @@ public partial class MainWindow : Window
         {
             var placeholder = Ui.Text(empty, 12, Ui.Muted); placeholder.Margin = new Thickness(0, 12, 0, 12); panel.Children.Add(placeholder);
         }
-        else foreach (var task in TaskService.Sort(list)) panel.Children.Add(TaskRow(task, dim: dim));
+        else
+        {
+            for (var i = 0; i < list.Count; i++)
+            {
+                var row = TaskRow(list[i], dim: dim, execution: execution, number: numbered ? i + 1 : null);
+                if (execution)
+                {
+                    row.Tag = list[i].Id;
+                    _executionRows.Add(row);
+                }
+                panel.Children.Add(row);
+            }
+        }
         return GlassCardBorder.Create(panel, new Thickness(17));
     }
 
-    private Border TaskRow(TaskItem task, bool dim = false, Action? refresh = null)
+    private Border TaskRow(TaskItem task, bool dim = false, Action? refresh = null, bool execution = false, int? number = null)
     {
         var longTerm = _service.IsLongTerm(task);
         var content = new Grid(); content.ColumnDefinitions.Add(new ColumnDefinition());
@@ -293,6 +324,8 @@ public partial class MainWindow : Window
         if (task.Color != TaskColor.None) badges.Children.Add(ColorStyle.Badge(_service.State.Settings, task.Color));
         if (longTerm) badges.Children.Add(Ui.Badge("长期任务"));
         else if (task.IsEvent) badges.Children.Add(Ui.Badge(Ui.Importance(task.EventImportance), task.EventImportance != EventImportance.Normal));
+        if (number is not null && _service.IsViewed(task, _service.Today)) badges.Children.Add(Ui.Badge("已查看"));
+        else if (number is not null && task.ScheduledDate > _service.Today) badges.Children.Add(Ui.Badge("提前提醒"));
         var dateLabel = task.ScheduledDate.ToString("M 月 d 日");
         if (task.State == TaskState.Completed) dateLabel += $" · {task.CompletedOn:M/d} 已完成";
         else if (task.State == TaskState.Cancelled) dateLabel += " · " + task.ArchiveReason;
@@ -347,6 +380,7 @@ public partial class MainWindow : Window
             }
         }
         AddTypeActions();
+        if (execution) menu.Items.Add(ExecutionMoveMenu(task));
         if (longTerm && _service.State.Events.FirstOrDefault(e => e.Id == task.EventId) is { EndDate: { } ended } endedDaily && ended <= _service.Today)
         {
             var renew = new MenuItem { Header = "继续一个阶段…", Tag = "renew-menu:" + task.Id }; renew.Click += (_, _) => OpenRenewal(endedDaily, refresh); menu.Items.Add(renew);
@@ -366,6 +400,7 @@ public partial class MainWindow : Window
         more.ContextMenu = menu; more.Click += (_, _) => { menu.PlacementTarget = more; menu.IsOpen = true; }; actions.Children.Add(more);
         Grid.SetColumn(actions, 1); content.Children.Add(actions);
         AddColorSelection(content, task);
+        if (execution) AddExecutionHandle(content, task, number);
         return new Border
         {
             Child = content, Padding = new Thickness(12, 11, 8, 11), Margin = new Thickness(0, 0, 0, 8),

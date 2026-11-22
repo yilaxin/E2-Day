@@ -31,6 +31,15 @@ if(process.argv[2]){
  invalidTime.Tasks[0].CreatedAt='2026-10-14';assert.throws(()=>validateMobileState(invalidTime));
  state.Tasks[0].ScheduledDate='2026-02-30';assert.throws(()=>validateMobileState(state));
  console.log('PASS portable backup: desktop hash matches browser implementation, PNG references preserved, invalid dates rejected before restore');
+ const executionFile=path.join(path.dirname(process.argv[2]),'execution-order-sample.json');
+ if(fs.existsSync(executionFile)){
+  const backup=JSON.parse(fs.readFileSync(executionFile,'utf8'));assert.equal(await portableHash(backup),backup.Sha256);
+  const data=validateMobileState(JSON.parse(backup.Payload)),plan=data.Settings.ExecutionPlan;
+  assert.equal(plan.Manual,true);assert.equal(plan.TaskIds.length,4);
+  const round=resolveImport(previewImport(data,structuredClone(data)),{});assert.deepEqual(round.Settings.ExecutionPlan,plan);
+  const bad=structuredClone(data);bad.Settings.ExecutionPlan.TaskIds.push(plan.TaskIds[0]);assert.throws(()=>validateMobileState(bad));
+  console.log('PASS execution order portable backup, local plan preservation and duplicate rejection');
+ }
  const periodFile=path.join(path.dirname(process.argv[2]),'period-sample.json');
  if(fs.existsSync(periodFile)){
   const backup=JSON.parse(fs.readFileSync(periodFile,'utf8'));assert.equal(await portableHash(backup),backup.Sha256);

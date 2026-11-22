@@ -21,6 +21,7 @@ public sealed partial class TaskService
 
     public void Save(IEnumerable<NoteImage>? images = null)
     {
+        ReconcileExecutionPlan();
         // Also invalidate readers if validation fails and State is reloaded.
         Revision++;
         try { _store.Save(State, images); }

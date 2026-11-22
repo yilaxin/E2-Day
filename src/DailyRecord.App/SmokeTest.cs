@@ -19,6 +19,7 @@ internal static partial class SmokeTest
         await VerifyTaskColors(window, service, holidays, clock, outputDirectory);
         await VerifyQuickTaskColors(holidays, outputDirectory);
         await VerifyLongTermPeriods(holidays, outputDirectory);
+        await VerifyExecutionOrder(holidays, outputDirectory);
         await VerifyPageResourceLifecycle(outputDirectory);
         await StartupSmokeTest.Run(outputDirectory);
         VerifyAccountFlow(outputDirectory);
@@ -227,7 +228,9 @@ internal static partial class SmokeTest
             var labels = Descendants(root).OfType<TextBlock>().Where(t => t.Tag is string tag && tag.StartsWith("share-task:")).ToList();
             Check(labels.Any(t => Equals(t.Tag, "share-task:" + overdue.Id)), "分享图遗漏逾期任务。");
             Check(labels.Any(t => t.TextDecorations.Count > 0), "分享图未保留今日完成状态。");
-            Check(labels.All(t => !t.Text.Contains("已取消") && !t.Text.Contains("今日已查看") && !t.Text.Contains("昨天已经完成") && !t.Text.Contains("预约年度体检") && !t.Text.Contains("提交材料")), "分享图包含范围之外的任务。");
+            Check(labels.Select(t => (string)t.Tag).SequenceEqual(service.TodayExecutionOrder()
+                .Concat(service.FilterToday(null).Where(t => t.State == TaskState.Completed))
+                .Select(t => "share-task:" + t.Id)), "自动排序的分享图与今日分组或可见范围不一致。");
             var bitmap = TaskShareImage.Render(root); SaveBitmap(bitmap, Path.Combine(outputDirectory, "task-share.png"));
             Check(bitmap.IsFrozen && bitmap.PixelWidth == 1140, "分享图清晰度或冻结状态错误。");
             var pixel = new byte[4]; bitmap.CopyPixels(new Int32Rect(0, 0, 1, 1), pixel, 4, 0);

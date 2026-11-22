@@ -467,6 +467,7 @@ ItemConversionTests.Run(Test, Check, () => NewFixture(), runRoot);
 TaskColorTests.Run(Test, Check, () => NewFixture(), runRoot);
 QuickTaskColorTests.Run(Test, Check, () => NewFixture(), runRoot);
 LongTermPeriodTests.Run(Test, Check, () => NewFixture(), runRoot);
+TodayExecutionOrderTests.Run(Test, Check, () => NewFixture(), runRoot);
 
 if (args.Contains("--network"))
 {

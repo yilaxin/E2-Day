@@ -18,7 +18,7 @@ internal static class TaskShareImage
     {
         var today = service.Today;
         var filtered = service.FilterToday(color);
-        var open = filtered.Where(t => t.State == TaskState.Open).ToList();
+        var open = service.TodayExecutionOrder(color);
         var pending = open.Where(t => t.ScheduledDate <= today && !service.IsViewed(t, today)).ToList();
         var completed = filtered.Where(t => t.State == TaskState.Completed).ToList();
         var upcoming = open.Where(t => t.ScheduledDate > today && !service.IsViewed(t, today)).ToList();
@@ -37,12 +37,14 @@ internal static class TaskShareImage
         date.Margin = new Thickness(0, 9, 0, 0); body.Children.Add(date);
         var context = Ui.Text(string.Join(" · ", new[] { information.Lunar, information.Festivals }.Where(s => s.Length > 0)), 12, Ui.Muted);
         context.Margin = new Thickness(0, 5, 0, 20); body.Children.Add(context);
-        var stats = Ui.Row(Ui.Badge($"待办 {(color is null ? pending.Count : open.Count)} 项"), Ui.Badge($"已完成 {completed.Count} 项"),
-            Ui.Badge($"★ 重要 {(color is null ? pending : open).Concat(completed).Count(t => t.IsImportant)} 项", true));
+        var stats = Ui.Row(Ui.Badge($"待办 {open.Count} 项"), Ui.Badge($"已完成 {completed.Count} 项"),
+            Ui.Badge($"★ 重要 {open.Concat(completed).Count(t => t.IsImportant)} 项", true));
         stats.Margin = new Thickness(0, 0, 0, 24); body.Children.Add(stats);
-        AddGroup(body, "今日待办", pending, today, "今天没有待办任务。", false, service.State.Settings);
-        if (color is not null)
+        if (service.UsesManualExecutionOrder)
+            AddGroup(body, "今日执行清单", open, today, "当前没有未完成事项。", false, service.State.Settings, service);
+        else
         {
+            AddGroup(body, "今日待办", pending, today, "今天没有待办任务。", false, service.State.Settings);
             if (upcoming.Count > 0) AddGroup(body, "提前提醒", upcoming, today, "", false, service.State.Settings);
             if (viewed.Count > 0) AddGroup(body, "今日已查看 · 仍未完成", viewed, today, "", false, service.State.Settings);
         }
@@ -61,7 +63,8 @@ internal static class TaskShareImage
         return root;
     }
 
-    private static void AddGroup(StackPanel body, string heading, IReadOnlyList<TaskItem> tasks, DateOnly today, string empty, bool completed, UserSettings settings)
+    private static void AddGroup(StackPanel body, string heading, IReadOnlyList<TaskItem> tasks, DateOnly today, string empty, bool completed,
+        UserSettings settings, TaskService? execution = null)
     {
         var title = Ui.Text($"{heading}  ·  {tasks.Count} 项", 18, Ui.Accent, true);
         title.Margin = new Thickness(0, 0, 0, 12); body.Children.Add(title);
@@ -69,11 +72,13 @@ internal static class TaskShareImage
         {
             var placeholder = Ui.Text(empty, 14, Ui.Muted); placeholder.Margin = new Thickness(0, 6, 0, 22); body.Children.Add(placeholder);
         }
-        foreach (var task in tasks)
+        for (var index = 0; index < tasks.Count; index++)
         {
+            var task = tasks[index];
             var row = new Grid();
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) }); row.ColumnDefinitions.Add(new ColumnDefinition());
-            var marker = Ui.Text(completed ? "✓" : "○", 20, completed ? Ui.Accent : task.IsImportant ? Ui.Amber : Ui.Muted);
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(execution is null ? 30 : 48) }); row.ColumnDefinitions.Add(new ColumnDefinition());
+            var marker = Ui.Text(execution is not null ? (index + 1).ToString() : completed ? "✓" : "○", 20,
+                completed || execution is not null ? Ui.Accent : task.IsImportant ? Ui.Amber : Ui.Muted);
             marker.VerticalAlignment = VerticalAlignment.Top; row.Children.Add(marker);
             var caption = Ui.Text(task.Title, 16, bold: task.IsImportant); caption.Tag = "share-task:" + task.Id;
             if (completed) caption.TextDecorations = TextDecorations.Strikethrough;
@@ -81,6 +86,9 @@ internal static class TaskShareImage
             var details = new List<string>();
             if (task.Color != TaskColor.None) details.Add(TaskColors.Name(settings, task.Color));
             if (task.IsImportant) details.Add("★ 重要任务");
+            if (execution?.IsLongTerm(task) == true) details.Add("长期任务");
+            if (execution?.IsViewed(task, today) == true) details.Add("已查看");
+            else if (execution is not null && task.ScheduledDate > today) details.Add("提前提醒");
             if (task.ScheduledDate < today && !completed) details.Add($"逾期 · 原定 {task.ScheduledDate:M 月 d 日}");
             else if (task.ScheduledDate != today) details.Add($"原定 {task.ScheduledDate:M 月 d 日}");
             if (details.Count > 0)

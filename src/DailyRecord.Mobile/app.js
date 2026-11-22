@@ -35,6 +35,9 @@ export function validateMobileState(state){
  for(const row of state.Events)if(!validDate(row.StartDate)||!['Normal','Important','VeryImportant'].includes(row.Importance)||!['None','Weekly','Monthly','Yearly','LunarYearly','Daily'].includes(row.Repeat)||row.Repeat==='LunarYearly'&&(!Number.isInteger(row.LunarMonth)||row.LunarMonth<1||row.LunarMonth>12||!Number.isInteger(row.LunarDay)||row.LunarDay<1||row.LunarDay>30))fail();
  for(const ev of state.Events){if(ev.LongTermPeriods!==undefined&&(!Array.isArray(ev.LongTermPeriods)||ev.LongTermPeriods.length>2000||ev.Repeat!=='Daily'&&ev.LongTermPeriods.length))fail();let prior=null;for(const p of ev.LongTermPeriods||[]){if(!p||!validDate(p.Start)||p.Start<ev.StartDate||typeof p.EndConfirmed!=='boolean'||p.End!=null&&(!validDate(p.End)||p.End<p.Start&&!p.EndConfirmed)||prior&&(prior.End==null||prior.End>=p.Start))fail();prior=p;}}
  if(state.Settings.CalendarView!==undefined&&!['All','HideLongTerm','Plain'].includes(state.Settings.CalendarView)||state.Settings.PreviousCalendarView!==undefined&&!['All','HideLongTerm'].includes(state.Settings.PreviousCalendarView))fail();
+ const execution=state.Settings.ExecutionPlan;
+ if(execution!=null&&(!validDate(execution.Day)||typeof execution.Manual!=='boolean'||!Array.isArray(execution.TaskIds)||
+     execution.TaskIds.some(id=>typeof id!=='string'||!id.trim())||new Set(execution.TaskIds).size!==execution.TaskIds.length))fail();
  for(const row of state.Tasks){if(!validDate(row.ScheduledDate)||!validDate(row.OriginalScheduledDate)||!['Open','Completed','Cancelled'].includes(row.State)||!['Normal','Important','VeryImportant'].includes(row.EventImportance)||typeof row.CreatedAt!=='string'||row.CompletedOn!==null&&row.CompletedOn!==undefined&&!validDate(row.CompletedOn)||row.State==='Completed'&&!row.CompletedOn)fail();if(row.EventId){const key=row.EventId+'/'+row.OccurrenceDate;if(!events.has(row.EventId)||!validDate(row.OccurrenceDate)||occurrencesSeen.has(key))fail();occurrencesSeen.add(key);}}
  const converted=new Set();
  for(const row of state.Tasks){if(!validTime(row.CreatedAt))fail();
@@ -105,7 +108,7 @@ export function canonical(value){
   if('ImageIds'in value&&'Title'in value)value={Color:'None',...value};
   if('StartDate'in value&&'Repeat'in value)value={LongTermPeriods:[],...value};
   if('OriginalScheduledDate'in value)value={ConversionSources:[],CompletedOrigin:null,ColorOverride:false,QuickColorRestore:null,...value};
-  if('NormalDays'in value)value={TaskColorNames:['本时段要做','专注处理','零碎处理','待沟通','稍后安排'],QuickTaskColor:'Blue',CalendarView:'All',PreviousCalendarView:'All',...value};
+  if('NormalDays'in value)value={TaskColorNames:['本时段要做','专注处理','零碎处理','待沟通','稍后安排'],QuickTaskColor:'Blue',CalendarView:'All',PreviousCalendarView:'All',ExecutionPlan:null,...value};
  }
  if(Array.isArray(value))return '['+value.map(canonical).join(',')+']';
  if(value&&typeof value==='object')return '{'+Object.keys(value).filter(key=>value[key]!==undefined).sort().map(key=>{let item=value[key];if(['CreatedAt','At'].includes(key)&&typeof item==='string'&&!Number.isNaN(Date.parse(item)))item=new Date(item).toISOString();return JSON.stringify(key)+':'+canonical(item);}).join(',')+'}';
